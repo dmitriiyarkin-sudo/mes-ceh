@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MES Цех Обивки — Управление производством</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    body { margin: 0; background: #f1f5f9; color: #1e293b; }
+    .hidden { display: none !important; }
+    .btn { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; padding: 8px 14px; font-size: 13px; transition: 0.15s; }
+    .btn-primary { background: #2563eb; color: #fff; } .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #94a3b8; cursor: wait; }
+    .btn-dark { background: #1e293b; color: #fff; } .btn-dark:hover { background: #0f172a; }
+    .btn-amber { background: #d97706; color: #fff; } .btn-amber:hover { background: #b45309; }
+    .btn-green { background: #16a34a; color: #fff; padding: 4px 8px; font-size: 12px; }
+    .btn-red { background: #fee2e2; color: #b91c1c; } .btn-light { background: #e2e8f0; color: #334155; }
+    .btn-sm { padding: 4px 9px; font-size: 13px; background: #fff; border: 1px solid #cbd5e1; }
+    input, select, textarea { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; font-size: 13px; background: #fff; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+    th { background: #f8fafc; font-weight: 700; }
+    .tc { text-align: center; }
+    .modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: #fff !important; }
+      .card { break-inside: avoid; border: 1px solid #000 !important; box-shadow: none !important; margin-bottom: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loginView" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;">
+    <div class="card" style="max-width:360px;width:100%;padding:32px;text-align:center;">
+      <div style="width:54px;height:54px;background:#2563eb;color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:26px;">🏭</div>
+      <h2 style="margin:0 0 6px;">Цех обивки — MES</h2>
+      <p style="margin:0 0 20px;font-size:13px;color:#64748b;">Введите ваш персональный PIN-код</p>
+      <input type="password" id="pinInp" maxlength="4" placeholder="••••" onkeyup="if(event.key==='Enter')doLogin()"
+             style="width:100%;text-align:center;font-size:24px;letter-spacing:8px;font-weight:bold;margin-bottom:14px;">
+      <button id="btnLogin" class="btn btn-primary" style="width:100%;padding:11px;font-size:15px;" onclick="doLogin()">Войти в систему</button>
+      <p id="loginErr" style="color:#dc2626;font-size:13px;font-weight:600;margin-top:12px;"></p>
+      <div style="margin-top:20px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;">
+        Планировщик — <b>1111</b> | ОТК Алексей — <b>2222</b> | Обивщики — <b>1001..1005</b>
+      </div>
+    </div>
+  </div>
+
+  <div id="appView" class="hidden">
+    <header style="background:#0f172a;color:#fff;padding:10px 16px;" class="no-print">
+      <div style="max-width:1280px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span style="background:#2563eb;padding:4px 10px;border-radius:6px;font-weight:700;font-size:13px;">MES ЦЕХ</span>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="nav-schedule" onclick="switchTab('schedule')">📅 Сменные задания</button>
+            <button class="btn btn-dark" id="nav-report" onclick="switchTab('report')">📊 Отчет и ABC</button>
+            <button class="btn btn-dark" id="nav-forecast" onclick="switchTab('forecast')">📈 Прогноз 7 дн.</button>
+            <button class="btn btn-dark hidden" id="nav-catalog" onclick="switchTab('catalog')">⚙️ Каталог и штат</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:13px;">
+          <span id="userBadge" style="background:#1e293b;padding:6px 12px;border-radius:8px;border:1px solid #334155;"></span>
+          <button class="btn btn-light" style="padding:5px 10px;" onclick="doLogout()">Выйти</button>
+        </div>
+      </div>
+    </header>
+    <main style="max-width:1280px;margin:0 auto;padding:16px;">
+      <div id="tab-schedule">
+        <div class="card no-print" style="padding:14px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;">
+          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">ЦЕХ</div>
+              <select id="selWorkshop" onchange="loadTasks()"></select>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">СМЕНА</div>
+              <select id="selShift" onchange="loadTasks()"></select>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">ДАТА СМЕНЫ</div>
+              <div style="display:flex;gap:4px;">
+                <button class="btn btn-light" onclick="shiftDate(-1)">◀</button>
+                <input type="date" id="selDate" onchange="loadTasks()" style="font-weight:700;">
+                <button class="btn btn-light" onclick="shiftDate(1)">▶</button>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-dark" onclick="window.print()">🖨️ Печать нарядов</button>
+            <button class="btn btn-amber hidden" id="btnRollover" onclick="runRollover()">🔄 Перенести остатки на завтра</button>
+          </div>
+        </div>
+        <div id="workersGrid" class="grid-cards"></div>
+      </div>
+
+      <div id="tab-report" class="hidden">
+        <div class="card" style="padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
+          <b>Выберите месяц отчета:</b>
+          <input type="month" id="repMonth" onchange="loadAnalytics()" style="font-weight:700;">
+        </div>
+        <div class="grid-2">
+          <div class="card" style="padding:16px;">
+            <h3 style="margin-top:0;">Выработка по обивщикам</h3>
+            <table><thead><tr><th>Сотрудник</th><th class="tc">План</th><th class="tc">Принято</th></tr></thead><tbody id="repWorkersBody"></tbody></table>
+          </div>
+          <div class="card" style="padding:16px;">
+            <h3 style="margin-top:0;margin-bottom:4px;">ABC-анализ по модели, обивке и цвету</h3>
+            <p style="font-size:12px;color:#64748b;margin-top:0;">A: до 80% выпуска | B: 80–95% | C: свыше 95%</p>
+            <div style="overflow-x:auto;">
+              <table><thead><tr><th>Модель</th><th>Обивка и цвет</th><th class="tc">План</th><th class="tc">Принято</th><th class="tc">Доля</th><th class="tc">Группа</th></tr></thead><tbody id="repAbcBody"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-forecast" class="hidden">
+        <div class="card" style="padding:16px;">
+          <h3 style="margin-top:0;margin-bottom:4px;">Прогноз выпуска на ближайшие 7 дней (по базе за 28 дней)</h3>
+          <p style="font-size:12px;color:#64748b;margin-top:0;">50% выпуск прошлой недели + 50% средний недельный выпуск за 3 предшествующие недели</p>
+          <div style="overflow-x:auto;">
+            <table><thead><tr><th>Модель</th><th>Обивка и цвет</th><th class="tc">Прошлая нед.</th><th class="tc">Средн. 3 нед.</th><th class="tc">Тренд</th><th class="tc" style="background:#dbeafe;">Прогноз 7 дн.</th><th class="tc">В плане</th><th class="tc" style="color:#b91c1c;">Допланировать</th></tr></thead><tbody id="fcBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-catalog" class="hidden">
+        <div class="grid-2">
+          <div class="card" style="padding:16px;">
+            <h3 style="margin-top:0;">Добавить вариант обивки к модели</h3>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <label><b>Модель кресла:</b><br><select id="catModelSel" style="width:100%;margin-top:4px;"></select></label>
+              <label><b>Новый вариант обивки и цвета:</b><br><input type="text" id="newVarInp" placeholder="Например: велюр изумрудный" style="width:100%;margin-top:4px;"></label>
+              <button class="btn btn-primary" onclick="addVariant()">Добавить обивку</button>
+            </div>
+          </div>
+          <div class="card" style="padding:16px;">
+            <h3 style="margin-top:0;">Штат, PIN-коды и дневные нормы</h3>
+            <table><thead><tr><th>Сотрудник</th><th>Роль</th><th>PIN</th><th>Норма/день</th></tr></thead><tbody id="catWorkersBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="taskModal" class="modal-bg hidden no-print">
+    <div class="card" style="max-width:430px;width:100%;padding:22px;">
+      <h3 id="modalTitle" style="margin:0 0 4px;">Новое задание</h3>
+      <p id="modalSub" style="margin:0 0 14px;font-size:12px;color:#64748b;"></p>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <label><b>1. Модель кресла:</b><br><select id="fModel" onchange="onModalModelChange()" style="width:100%;margin-top:4px;"></select></label>
+        <label><b>2. Обивка и цвет:</b><br><select id="fVariant" style="width:100%;margin-top:4px;"></select></label>
+        <label><b>3. План (шт.):</b><br><input type="number" id="fQty" min="1" max="50" value="1" style="width:100%;margin-top:4px;font-weight:700;"></label>
+        <div id="reasonBox" class="hidden" style="background:#fef2f2;border:1px solid #fca5a5;padding:10px;border-radius:8px;">
+          <label style="font-size:12px;font-weight:700;color:#b91c1c;">⚠️ Прошло более 3 часов. Причина изменения (обязательно):</label>
+          <textarea id="fReason" rows="2" placeholder="Укажите причину правки или отмены..." style="width:100%;margin-top:4px;border-color:#fca5a5;"></textarea>
+        </div>
+        <p id="modalErr" style="color:#dc2626;font-size:12px;font-weight:700;margin:0;"></p>
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <button class="btn btn-primary" style="flex:1;" onclick="saveTask()">Сохранить</button>
+          <button class="btn btn-red hidden" id="btnDelTask" onclick="deleteTask()">Удалить</button>
+          <button class="btn btn-light" onclick="closeModal()">Отмена</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const SUPABASE_URL = 'https://zyviacyiefktjluhhdtf.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_PlxBXL2o1RQttVyIz3YYXA_x5nWq52f';
+
+    let state = {
+      user: null, workshops: [], shifts: [], workers: [], models: [], variants: [], allowances: [], tasks: [],
+      modalWorker: null, modalSlot: 1, editingTask: null
+    };
+
+    async function sbFetch(path, options) {
+      const opts = options || {};
+      const headers = Object.assign({
+        'apikey': SUPABASE_ANON_KEY.trim(),
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY.trim(),
+        'Content-Type': 'application/json'
+      }, opts.headers || {});
+      const res = await fetch(SUPABASE_URL.trim() + '/rest/v1/' + path, Object.assign({}, opts, { headers }));
+      const txt = await res.text();
+      let data = null;
+      try { data = txt ? JSON.parse(txt) : null; } catch (e) { data = txt; }
+      if (!res.ok) throw new Error((data && data.message) ? data.message : ('Ошибка HTTP ' + res.status));
+      return data;
+    }
+
+    function el(id) { return document.getElementById(id); }
+    function roleName(r) { return r === 'admin' ? 'Руководитель' : (r === 'otk' ? 'ОТК / Ст. мастер' : 'Обивщик'); }
+    function fmtDateRu(iso) {
+      const p = String(iso).split('-');
+      if (p.length !== 3) return iso;
+      const y = p.shift(); const m = p.shift(); const d = p.shift();
+      return d + '.' + m + '.' + y;
+    }
+    async function bootstrap() {
+      el('selDate').value = new Date().toISOString().slice(0, 10);
+      el('repMonth').value = new Date().toISOString().slice(0, 7);
+      const loginBtn = el('btnLogin');
+      if (loginBtn) { loginBtn.disabled = true; loginBtn.innerText = '⏳ Подключение к базе...'; }
+      el('loginErr').innerText = '';
+
+      if (!SUPABASE_URL.startsWith('http')) {
+        el('loginErr').innerText = 'Укажите SUPABASE_URL и SUPABASE_ANON_KEY в коде файла!';
+        if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Войти в систему'; }
+        return;
+      }
+      try {
+        const res = await Promise.all([
+          sbFetch('workshops?is_active=eq.true&order=id'),
+          sbFetch('shifts?order=sort_order'),
+          sbFetch('workers?is_active=eq.true&order=id'),
+          sbFetch('chair_models?is_active=eq.true&order=id'),
+          sbFetch('model_variants?order=id'),
+          sbFetch('worker_allowed_models')
+        ]);
+        state.workshops = res.shift() || [];
+        state.shifts = res.shift() || [];
+        state.workers = res.shift() || [];
+        state.models = res.shift() || [];
+        state.variants = res.shift() || [];
+        state.allowances = res.shift() || [];
+
+        if (!state.workers.length) {
+          el('loginErr').innerText = 'Список сотрудников пуст. Проверьте таблицу workers в Supabase.';
+          if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Повторить подключение'; }
+          return;
+        }
+
+        el('selWorkshop').innerHTML = state.workshops.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('');
+        el('selShift').innerHTML = state.shifts.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
+        el('catModelSel').innerHTML = state.models.map(m => '<option value="' + m.id + '">' + m.name + '</option>').join('');
+        if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Войти в систему'; }
+      } catch (err) {
+        el('loginErr').innerText = 'Нет связи с базой: ' + err.message;
+        if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Повторить подключение'; }
+      }
+    }
+
+    function doLogin() {
+      if (!state.workers.length) {
+        bootstrap();
+        return;
+      }
+      const pin = el('pinInp').value.trim();
+      const found = state.workers.find(w => String(w.pin_code) === pin);
+      if (!found) { el('loginErr').innerText = 'Неверный PIN-код'; return; }
+      state.user = found;
+      el('loginErr').innerText = ''; el('pinInp').value = '';
+      el('loginView').classList.add('hidden');
+      el('appView').classList.remove('hidden');
+      el('userBadge').innerHTML = '👤 <b>' + found.name + '</b> (' + roleName(found.role) + ')';
+
+      const isAdmin = found.role === 'admin';
+      el('nav-catalog').classList.toggle('hidden', !isAdmin);
+      el('btnRollover').classList.toggle('hidden', !isAdmin);
+      renderCatalogWorkers();
+      loadTasks();
+      setInterval(() => { if (!el('appView').classList.contains('hidden')) loadTasks(); }, 10000);
+    }
+
+    function doLogout() {
+      state.user = null;
+      el('appView').classList.add('hidden');
+      el('loginView').classList.remove('hidden');
+    }
+
+    function switchTab(name) {
+      ['schedule', 'report', 'forecast', 'catalog'].forEach(t => {
+        el('tab-' + t).classList.toggle('hidden', t !== name);
+        const nb = el('nav-' + t);
+        if (nb) { nb.className = (t === name) ? 'btn btn-primary' : 'btn btn-dark'; }
+      });
+      if (name === 'report' || name === 'forecast') loadAnalytics();
+    }
+    function shiftDate(days) {
+      const d = new Date(el('selDate').value);
+      d.setDate(d.getDate() + days);
+      el('selDate').value = d.toISOString().slice(0, 10);
+      loadTasks();
+    }
+
+    async function loadTasks() {
+      const d = el('selDate').value;
+      const wId = el('selWorkshop').value;
+      const sId = el('selShift').value;
+      try {
+        state.tasks = await sbFetch('tasks?work_date=eq.' + d + '&workshop_id=eq.' + wId + '&shift_id=eq.' + sId + '&status=eq.active') || [];
+        renderWorkersGrid();
+      } catch (e) { console.error(e); }
+    }
+
+    function renderWorkersGrid() {
+      const wId = Number(el('selWorkshop').value);
+      let list = state.workers.filter(w => w.role === 'worker' && w.workshop_id === wId);
+      if (state.user.role === 'worker') list = list.filter(w => w.id === state.user.id);
+
+      const isAdmin = state.user.role === 'admin';
+      const canOtk = isAdmin || state.user.role === 'otk';
+
+      el('workersGrid').innerHTML = list.map(w => {
+        const wTasks = state.tasks.filter(t => t.worker_id === w.id);
+        const planSum = wTasks.reduce((s, t) => s + t.plan_qty, 0);
+        const accSum = wTasks.reduce((s, t) => s + t.accepted_qty, 0);
+        const normTxt = w.max_per_day ? ' <span style="color:#1d4ed8;font-weight:700;">(Норма: ' + w.max_per_day + ')</span>' : '';
+
+        let slotsHtml = '';
+        for (let slot = 1; slot <= 6; slot++) {
+          const t = wTasks.find(x => x.slot_index === slot);
+          if (t) {
+            const mName = (state.models.find(m => m.id === t.model_id) || {}).name || '—';
+            const vName = (state.variants.find(v => v.id === t.variant_id) || {}).variant_name || '—';
+            const bg = t.accepted_qty >= t.plan_qty ? '#dcfce7;border-color:#4ade80' : (t.accepted_qty > 0 ? '#fef3c7;border-color:#fbbf24' : '#f8fafc;border-color:#cbd5e1');
+            const note = t.carryover_note ? '<span style="background:#fde68a;color:#78350f;padding:1px 6px;border-radius:4px;font-size:11px;margin-left:4px;">' + t.carryover_note + '</span>' : '';
+            const otkBtns = canOtk
+              ? '<button class="btn btn-sm" onclick="changeAcc(\'' + t.id + '\',' + (t.accepted_qty - 1) + ',' + t.plan_qty + ')">−</button>' +
+                '<b style="min-width:24px;text-align:center;color:#15803d;">' + t.accepted_qty + '</b>' +
+                '<button class="btn btn-sm" onclick="changeAcc(\'' + t.id + '\',' + (t.accepted_qty + 1) + ',' + t.plan_qty + ')">+</button>' +
+                '<button class="btn btn-green" onclick="changeAcc(\'' + t.id + '\',' + t.plan_qty + ',' + t.plan_qty + ')">Всё ✓</button>'
+              : '<b style="color:#15803d;">' + t.accepted_qty + ' из ' + t.plan_qty + '</b>';
+            const editBtn = isAdmin ? '<button class="btn btn-light" style="padding:3px 8px;font-size:11px;" onclick="openModal(' + w.id + ',' + slot + ',\'' + t.id + '\')">Изменить</button>' : '';
+
+            slotsHtml += '<div style="padding:10px;border:1px solid ' + bg + ';border-radius:8px;margin-bottom:8px;">' +
+              '<div style="display:flex;justify-content:space-between;gap:8px;">' +
+                '<div><b>' + slot + '. ' + mName + '</b>' + note + '<div style="font-size:12px;color:#475569;">' + vName + '</div></div>' +
+                '<span style="background:#fff;border:1px solid #cbd5e1;padding:2px 7px;border-radius:6px;font-size:12px;font-weight:700;height:fit-content;">План: ' + t.plan_qty + ' шт.</span>' +
+              '</div>' +
+              '<div class="no-print" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08);display:flex;justify-content:space-between;align-items:center;">' +
+                '<div style="display:flex;align-items:center;gap:4px;font-size:12px;"><span>Принято:</span>' + otkBtns + '</div>' + editBtn +
+              '</div>' +
+            '</div>';
+          } else if (isAdmin) {
+            slotsHtml += '<button onclick="openModal(' + w.id + ',' + slot + ',null)" class="no-print" style="width:100%;text-align:left;padding:7px 10px;margin-bottom:6px;border:1px dashed #cbd5e1;border-radius:8px;background:transparent;color:#64748b;cursor:pointer;font-size:12px;">+ Слот ' + slot + ' (назначить задание)</button>';
+          }
+        }
+
+        return '<div class="card" style="overflow:hidden;">' +
+          '<div style="padding:12px 14px;border-bottom:1px solid #e2e8f0;background:' + (w.color_hex || '#ebf3fa') + ';">' +
+            '<div style="font-weight:700;font-size:15px;">' + w.name + '</div>' +
+            '<div style="font-size:12px;color:#334155;">План: <b>' + planSum + '</b> шт. | Принято ОТК: <b style="color:#15803d;">' + accSum + '</b> шт.' + normTxt + '</div>' +
+          '</div>' +
+          '<div style="padding:12px;">' + slotsHtml + '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    async function changeAcc(taskId, nextVal, maxVal) {
+      const clamped = Math.max(0, Math.min(maxVal, nextVal));
+      await sbFetch('tasks?id=eq.' + taskId, { method: 'PATCH', body: JSON.stringify({ accepted_qty: clamped }) });
+      loadTasks();
+    }
+    function openModal(workerId, slot, taskId) {
+      state.modalWorker = state.workers.find(w => w.id === workerId);
+      state.modalSlot = slot;
+      state.editingTask = taskId ? state.tasks.find(t => t.id === taskId) : null;
+      el('modalErr').innerText = ''; el('fReason').value = '';
+      el('modalTitle').innerText = state.editingTask ? ('Редактирование слота #' + slot) : ('Новое задание (Слот #' + slot + ')');
+      el('modalSub').innerText = 'Обивщик: ' + state.modalWorker.name + ' | Дата: ' + fmtDateRu(el('selDate').value);
+
+      const allowedIds = state.allowances.filter(a => a.worker_id === workerId).map(a => a.model_id);
+      const allowedModels = allowedIds.length ? state.models.filter(m => allowedIds.includes(m.id)) : state.models;
+      el('fModel').innerHTML = allowedModels.map(m => '<option value="' + m.id + '">' + m.name + '</option>').join('');
+
+      if (state.editingTask) {
+        el('fModel').value = state.editingTask.model_id;
+        onModalModelChange();
+        el('fVariant').value = state.editingTask.variant_id;
+        el('fQty').value = state.editingTask.plan_qty;
+        el('btnDelTask').classList.remove('hidden');
+        const over3h = (Date.now() - new Date(state.editingTask.created_at).getTime()) >= (3 * 60 * 60 * 1000);
+        el('reasonBox').classList.toggle('hidden', !over3h);
+      } else {
+        onModalModelChange();
+        el('fQty').value = 1;
+        el('btnDelTask').classList.add('hidden');
+        el('reasonBox').classList.add('hidden');
+      }
+      el('taskModal').classList.remove('hidden');
+    }
+
+    function onModalModelChange() {
+      const mId = Number(el('fModel').value);
+      const vs = state.variants.filter(v => v.model_id === mId);
+      el('fVariant').innerHTML = vs.map(v => '<option value="' + v.id + '">' + v.variant_name + '</option>').join('');
+    }
+
+    function closeModal() { el('taskModal').classList.add('hidden'); }
+
+    async function saveTask() {
+      el('modalErr').innerText = '';
+      const mId = Number(el('fModel').value);
+      const vId = Number(el('fVariant').value);
+      const qty = Number(el('fQty').value);
+      const reason = el('fReason').value.trim();
+
+      try {
+        if (state.editingTask) {
+          await sbFetch('rpc/update_task_with_reason', {
+            method: 'POST',
+            body: JSON.stringify({
+              p_task_id: state.editingTask.id, p_model_id: mId, p_variant_id: vId,
+              p_plan_qty: qty, p_reason: reason, p_editor: state.user.name
+            })
+          });
+        } else {
+          await sbFetch('tasks', {
+            method: 'POST',
+            body: JSON.stringify({
+              work_date: el('selDate').value, workshop_id: Number(el('selWorkshop').value),
+              shift_id: Number(el('selShift').value), worker_id: state.modalWorker.id,
+              slot_index: state.modalSlot, model_id: mId, variant_id: vId,
+              plan_qty: qty, created_by: state.user.name
+            })
+          });
+        }
+        closeModal(); loadTasks();
+      } catch (err) { el('modalErr').innerText = err.message; }
+    }
+
+    async function deleteTask() {
+      try {
+        await sbFetch('rpc/delete_task_with_reason', {
+          method: 'POST',
+          body: JSON.stringify({ p_task_id: state.editingTask.id, p_reason: el('fReason').value.trim(), p_editor: state.user.name })
+        });
+        closeModal(); loadTasks();
+      } catch (err) { el('modalErr').innerText = err.message; }
+    }
+    async function runRollover() {
+      try {
+        const moved = await sbFetch('rpc/rollover_unaccepted_tasks', { method: 'POST', body: JSON.stringify({ p_src_date: el('selDate').value }) });
+        alert('Перенесено невыполненных кресел на завтра: ' + (moved || 0) + ' шт.');
+        loadTasks();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function addVariant() {
+      const name = el('newVarInp').value.trim();
+      if (!name) return;
+      await sbFetch('model_variants', { method: 'POST', body: JSON.stringify({ model_id: Number(el('catModelSel').value), variant_name: name }) });
+      state.variants = await sbFetch('model_variants?order=id') || [];
+      el('newVarInp').value = '';
+      alert('Вариант обивки добавлен!');
+    }
+
+    function renderCatalogWorkers() {
+      el('catWorkersBody').innerHTML = state.workers.map(w =>
+        '<tr><td><b>' + w.name + '</b></td><td>' + roleName(w.role) + '</td><td><code>' + w.pin_code + '</code></td><td><b>' + (w.max_per_day || 'Без лимита') + '</b></td></tr>'
+      ).join('');
+    }
+    async function loadAnalytics() {
+      const mStr = el('repMonth').value;
+      const mTasks = await sbFetch('tasks?work_date=gte.' + mStr + '-01&work_date=lte.' + mStr + '-31&status=eq.active') || [];
+
+      el('repWorkersBody').innerHTML = state.workers.filter(w => w.role === 'worker').map(w => {
+        const wt = mTasks.filter(t => t.worker_id === w.id);
+        const p = wt.reduce((s, t) => s + t.plan_qty, 0);
+        const a = wt.reduce((s, t) => s + t.accepted_qty, 0);
+        return '<tr><td>' + w.name + '</td><td class="tc"><b>' + p + '</b></td><td class="tc" style="color:#15803d;"><b>' + a + '</b></td></tr>';
+      }).join('');
+
+      const abcMap = {}; let totAcc = 0;
+      mTasks.forEach(t => {
+        const k = t.model_id + '_' + t.variant_id;
+        if (!abcMap[k]) abcMap[k] = {
+          model: (state.models.find(m => m.id === t.model_id) || {}).name || '—',
+          mat: (state.variants.find(v => v.id === t.variant_id) || {}).variant_name || '—',
+          plan: 0, acc: 0
+        };
+        abcMap[k].plan += t.plan_qty; abcMap[k].acc += t.accepted_qty; totAcc += t.accepted_qty;
+      });
+      const sortedAbc = Object.values(abcMap).sort((a, b) => (b.acc - a.acc) || (b.plan - a.plan));
+      const basis = totAcc > 0 ? totAcc : sortedAbc.reduce((s, x) => s + x.plan, 0);
+      let cum = 0;
+      el('repAbcBody').innerHTML = sortedAbc.map(it => {
+        const v = totAcc > 0 ? it.acc : it.plan;
+        const share = basis > 0 ? v / basis : 0;
+        const prev = cum; cum += share;
+        const grp = v === 0 ? 'C' : (prev < 0.80 ? 'A' : (prev < 0.95 ? 'B' : 'C'));
+        const rowBg = grp === 'A' ? '#dcfce7' : (grp === 'B' ? '#fef9c3' : '#fff');
+        return '<tr style="background:' + rowBg + ';"><td><b>' + it.model + '</b></td><td>' + it.mat + '</td><td class="tc">' + it.plan + '</td><td class="tc" style="color:#15803d;"><b>' + it.acc + '</b></td><td class="tc">' + (share * 100).toFixed(1) + '%</td><td class="tc"><b>' + grp + '</b></td></tr>';
+      }).join('');
+
+      const today = new Date();
+      const d28 = new Date(today); d28.setDate(today.getDate() - 28);
+      const d6 = new Date(today); d6.setDate(today.getDate() + 6);
+      const fTasks = await sbFetch('tasks?work_date=gte.' + d28.toISOString().slice(0, 10) + '&work_date=lte.' + d6.toISOString().slice(0, 10) + '&status=eq.active') || [];
+      const fMap = {};
+      const todayIso = today.toISOString().slice(0, 10);
+      const d7Iso = new Date(today.getTime() - 7 * 86400000).toISOString().slice(0, 10);
+
+      fTasks.forEach(t => {
+        const k = t.model_id + '_' + t.variant_id;
+        if (!fMap[k]) fMap[k] = {
+          model: (state.models.find(m => m.id === t.model_id) || {}).name || '—',
+          mat: (state.variants.find(v => v.id === t.variant_id) || {}).variant_name || '—',
+          w1: 0, w24: 0, nextPlan: 0
+        };
+        if (t.work_date >= todayIso) fMap[k].nextPlan += t.plan_qty;
+        else if (t.work_date >= d7Iso) fMap[k].w1 += (t.accepted_qty || t.plan_qty);
+        else fMap[k].w24 += (t.accepted_qty || t.plan_qty);
+      });
+
+      el('fcBody').innerHTML = Object.values(fMap).map(it => {
+        const avg3 = it.w24 / 3;
+        const fc = Math.ceil(avg3 > 0 ? (0.5 * it.w1 + 0.5 * avg3) : it.w1);
+        const trend = avg3 === 0 && it.w1 > 0 ? '🆕 Новый' : (it.w1 > avg3 * 1.15 ? '↗ Рост' : (it.w1 < avg3 * 0.85 ? '↘ Спад' : '→ Стаб.'));
+        return { model: it.model, mat: it.mat, w1: it.w1, avg3: avg3.toFixed(1), trend: trend, fc: fc, next: it.nextPlan, toPlan: Math.max(0, fc - it.nextPlan) };
+      }).sort((a, b) => b.fc - a.fc).map(r =>
+        '<tr><td><b>' + r.model + '</b></td><td>' + r.mat + '</td><td class="tc">' + r.w1 + '</td><td class="tc">' + r.avg3 + '</td><td class="tc">' + r.trend + '</td><td class="tc" style="background:#dbeafe;font-weight:700;">' + r.fc + '</td><td class="tc">' + r.next + '</td><td class="tc" style="color:#b91c1c;font-weight:700;">' + r.toPlan + '</td></tr>'
+      ).join('');
+    }
+    window.addEventListener('DOMContentLoaded', bootstrap);
+  </script>
+</body>
+</html>
