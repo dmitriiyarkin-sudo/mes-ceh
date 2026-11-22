@@ -196,18 +196,37 @@
       const y = p.shift(); const m = p.shift(); const d = p.shift();
       return d + '.' + m + '.' + y;
     }
+    function applyCatalogData(data) {
+      state.workshops = data.workshops || [];
+      state.shifts = data.shifts || [];
+      state.workers = data.workers || [];
+      state.models = data.models || [];
+      state.variants = data.variants || [];
+      state.allowances = data.allowances || [];
+      if (!state.workers.length) return false;
+      el('selWorkshop').innerHTML = state.workshops.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('');
+      el('selShift').innerHTML = state.shifts.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
+      el('catModelSel').innerHTML = state.models.map(m => '<option value="' + m.id + '">' + m.name + '</option>').join('');
+      return true;
+    }
+
     async function bootstrap() {
       el('selDate').value = new Date().toISOString().slice(0, 10);
       el('repMonth').value = new Date().toISOString().slice(0, 7);
       const loginBtn = el('btnLogin');
-      if (loginBtn) { loginBtn.disabled = true; loginBtn.innerText = '⏳ Подключение к базе...'; }
       el('loginErr').innerText = '';
 
-      if (!SUPABASE_URL.startsWith('http')) {
-        el('loginErr').innerText = 'Укажите SUPABASE_URL и SUPABASE_ANON_KEY в коде файла!';
-        if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Войти в систему'; }
-        return;
-      }
+      try {
+        const cached = localStorage.getItem('mes_catalog_v1');
+        if (cached && applyCatalogData(JSON.parse(cached)) && loginBtn) {
+          loginBtn.disabled = false;
+          loginBtn.innerText = 'Войти в систему';
+        } else if (loginBtn) {
+          loginBtn.disabled = true;
+          loginBtn.innerText = '⏳ Подключение к базе...';
+        }
+      } catch (e) {}
+
       try {
         const res = await Promise.all([
           sbFetch('workshops?is_active=eq.true&order=id'),
@@ -217,34 +236,26 @@
           sbFetch('model_variants?order=id'),
           sbFetch('worker_allowed_models')
         ]);
-        state.workshops = res.shift() || [];
-        state.shifts = res.shift() || [];
-        state.workers = res.shift() || [];
-        state.models = res.shift() || [];
-        state.variants = res.shift() || [];
-        state.allowances = res.shift() || [];
-
-        if (!state.workers.length) {
+        const fresh = {
+          workshops: res.shift() || [], shifts: res.shift() || [],
+          workers: res.shift() || [], models: res.shift() || [],
+          variants: res.shift() || [], allowances: res.shift() || []
+        };
+        if (applyCatalogData(fresh)) {
+          try { localStorage.setItem('mes_catalog_v1', JSON.stringify(fresh)); } catch (e) {}
+          if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Войти в систему'; }
+        } else {
           el('loginErr').innerText = 'Список сотрудников пуст. Проверьте таблицу workers в Supabase.';
-          if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Повторить подключение'; }
-          return;
         }
-
-        el('selWorkshop').innerHTML = state.workshops.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('');
-        el('selShift').innerHTML = state.shifts.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
-        el('catModelSel').innerHTML = state.models.map(m => '<option value="' + m.id + '">' + m.name + '</option>').join('');
-        if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Войти в систему'; }
       } catch (err) {
-        el('loginErr').innerText = 'Нет связи с базой: ' + err.message;
-        if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Повторить подключение'; }
+        if (!state.workers.length) {
+          el('loginErr').innerText = 'Нет связи с базой: ' + err.message;
+          if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Повторить подключение'; }
+        }
       }
     }
-
     function doLogin() {
-      if (!state.workers.length) {
-        bootstrap();
-        return;
-      }
+      if (!state.workers.length) { bootstrap(); return; }
       const pin = el('pinInp').value.trim();
       const found = state.workers.find(w => String(w.pin_code) === pin);
       if (!found) { el('loginErr').innerText = 'Неверный PIN-код'; return; }
@@ -349,8 +360,15 @@
 
     async function changeAcc(taskId, nextVal, maxVal) {
       const clamped = Math.max(0, Math.min(maxVal, nextVal));
-      await sbFetch('tasks?id=eq.' + taskId, { method: 'PATCH', body: JSON.stringify({ accepted_qty: clamped }) });
-      loadTasks();
+      const task = state.tasks.find(t => t.id === taskId);
+      const prevVal = task ? task.accepted_qty : 0;
+      if (task) { task.accepted_qty = clamped; renderWorkersGrid(); }
+      try {
+        await sbFetch('tasks?id=eq.' + taskId, { method: 'PATCH', body: JSON.stringify({ accepted_qty: clamped }) });
+      } catch (err) {
+        if (task) { task.accepted_qty = prevVal; renderWorkersGrid(); }
+        alert('Ошибка приёмки: ' + err.message);
+      }
     }
     function openModal(workerId, slot, taskId) {
       state.modalWorker = state.workers.find(w => w.id === workerId);
@@ -396,38 +414,78 @@
       const qty = Number(el('fQty').value);
       const reason = el('fReason').value.trim();
 
-      try {
-        if (state.editingTask) {
+      const limit = state.modalWorker.max_per_day;
+      if (limit && limit > 0) {
+        const otherSum = state.tasks
+          .filter(t => t.worker_id === state.modalWorker.id && (!state.editingTask || t.id !== state.editingTask.id))
+          .reduce((s, t) => s + t.plan_qty, 0);
+        if (otherSum + qty > limit) {
+          el('modalErr').innerText = 'Превышен дневной лимит для ' + state.modalWorker.name + ': макс. ' + limit + ' шт. (уже ' + otherSum + ' шт.)';
+          return;
+        }
+      }
+
+      if (state.editingTask) {
+        const target = state.editingTask;
+        const backup = Object.assign({}, target);
+        target.model_id = mId; target.variant_id = vId; target.plan_qty = qty;
+        closeModal(); renderWorkersGrid();
+        try {
           await sbFetch('rpc/update_task_with_reason', {
             method: 'POST',
             body: JSON.stringify({
-              p_task_id: state.editingTask.id, p_model_id: mId, p_variant_id: vId,
+              p_task_id: target.id, p_model_id: mId, p_variant_id: vId,
               p_plan_qty: qty, p_reason: reason, p_editor: state.user.name
             })
           });
-        } else {
-          await sbFetch('tasks', {
+        } catch (err) {
+          Object.assign(target, backup); renderWorkersGrid();
+          alert('Изменение отклонено сервером: ' + err.message);
+        }
+      } else {
+        const tempId = 'temp_' + Date.now();
+        const optimisticTask = {
+          id: tempId, work_date: el('selDate').value, workshop_id: Number(el('selWorkshop').value),
+          shift_id: Number(el('selShift').value), worker_id: state.modalWorker.id,
+          slot_index: state.modalSlot, model_id: mId, variant_id: vId,
+          plan_qty: qty, accepted_qty: 0, created_at: new Date().toISOString(), created_by: state.user.name
+        };
+        state.tasks.push(optimisticTask);
+        closeModal(); renderWorkersGrid();
+        try {
+          const inserted = await sbFetch('tasks', {
             method: 'POST',
+            headers: { 'Prefer': 'return=representation' },
             body: JSON.stringify({
-              work_date: el('selDate').value, workshop_id: Number(el('selWorkshop').value),
-              shift_id: Number(el('selShift').value), worker_id: state.modalWorker.id,
-              slot_index: state.modalSlot, model_id: mId, variant_id: vId,
+              work_date: optimisticTask.work_date, workshop_id: optimisticTask.workshop_id,
+              shift_id: optimisticTask.shift_id, worker_id: optimisticTask.worker_id,
+              slot_index: optimisticTask.slot_index, model_id: mId, variant_id: vId,
               plan_qty: qty, created_by: state.user.name
             })
           });
+          if (inserted && inserted.length) Object.assign(optimisticTask, inserted.shift());
+        } catch (err) {
+          state.tasks = state.tasks.filter(t => t.id !== tempId);
+          renderWorkersGrid();
+          alert('Ошибка сохранения: ' + err.message);
         }
-        closeModal(); loadTasks();
-      } catch (err) { el('modalErr').innerText = err.message; }
+      }
     }
 
     async function deleteTask() {
+      const target = state.editingTask;
+      const reason = el('fReason').value.trim();
+      state.tasks = state.tasks.filter(t => t.id !== target.id);
+      closeModal(); renderWorkersGrid();
       try {
         await sbFetch('rpc/delete_task_with_reason', {
           method: 'POST',
-          body: JSON.stringify({ p_task_id: state.editingTask.id, p_reason: el('fReason').value.trim(), p_editor: state.user.name })
+          body: JSON.stringify({ p_task_id: target.id, p_reason: reason, p_editor: state.user.name })
         });
-        closeModal(); loadTasks();
-      } catch (err) { el('modalErr').innerText = err.message; }
+      } catch (err) {
+        state.tasks.push(target); renderWorkersGrid();
+        alert('Удаление отклонено сервером: ' + err.message);
+      }
     }
     async function runRollover() {
       try {
@@ -442,6 +500,7 @@
       if (!name) return;
       await sbFetch('model_variants', { method: 'POST', body: JSON.stringify({ model_id: Number(el('catModelSel').value), variant_name: name }) });
       state.variants = await sbFetch('model_variants?order=id') || [];
+      try { localStorage.removeItem('mes_catalog_v1'); } catch (e) {}
       el('newVarInp').value = '';
       alert('Вариант обивки добавлен!');
     }
