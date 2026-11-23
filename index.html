@@ -188,6 +188,7 @@
           </div>
         </div>
       </div>
+
       <div id="tab-forecast" class="hidden">
         <div class="card" style="padding:16px;">
           <h3 style="margin-top:0;margin-bottom:4px;">Прогноз выпуска на ближайшие 7 дней (по базе за 28 дней)</h3>
@@ -232,6 +233,7 @@
       </div>
     </main>
   </div>
+
   <div id="taskModal" class="modal-bg hidden no-print">
     <div class="card" style="max-width:430px;width:100%;padding:22px;">
       <h3 id="modalTitle" style="margin:0 0 4px;">Новое задание</h3>
@@ -265,8 +267,10 @@
     };
 
     function buildUrl(path, channel) {
-      if (channel === 'direct') return DIRECT_SUPABASE_URL + '/rest/v1/' + path;
-      const parts = path.split('?');
+      const sep = path.includes('?') ? '&' : '?';
+      const pathWithKey = path + sep + 'apikey=' + encodeURIComponent(SUPABASE_ANON_KEY);
+      if (channel === 'direct') return DIRECT_SUPABASE_URL + '/rest/v1/' + pathWithKey;
+      const parts = pathWithKey.split('?');
       const tableOrRpc = parts.shift();
       const queryPart = parts.join('?');
       return YANDEX_PROXY_URL + '?p=' + encodeURIComponent(tableOrRpc) + (queryPart ? '&' + queryPart : '');
@@ -276,7 +280,6 @@
       const opts = options || {};
       const headers = Object.assign({
         'apikey': SUPABASE_ANON_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
         'Content-Type': 'application/json'
       }, opts.headers || {});
 
