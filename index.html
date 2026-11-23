@@ -267,7 +267,10 @@
   </div>
   <script>
     const YANDEX_PROXY_URL = 'https://yandexcloud.net';
+    const DIRECT_SUPABASE_URL = 'https://supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_PlxBXL2o1RQttVyIz3YYXA_x5nWq52f';
+
+    let activeChannel = 'yandex';
 
     let state = {
       user: null, workshops: [], shifts: [], workers: [], models: [], variants: [], allowances: [], tasks: [],
@@ -275,29 +278,39 @@
       modalWorker: null, modalSlot: 1, editingTask: null
     };
 
-    async function sbFetch(path, options) {
-      const opts = options || {};
+    function buildUrl(path, channel) {
+      if (channel === 'direct') {
+        return DIRECT_SUPABASE_URL + '/rest/v1/' + path;
+      }
       const parts = path.split('?');
       const tableOrRpc = parts.shift();
       const queryPart = parts.join('?');
-      const fullUrl = YANDEX_PROXY_URL.trim() + '?p=' + encodeURIComponent(tableOrRpc) + (queryPart ? '&' + queryPart : '');
+      return YANDEX_PROXY_URL + '?p=' + encodeURIComponent(tableOrRpc) + (queryPart ? '&' + queryPart : '');
+    }
 
+    async function sbFetch(path, options) {
+      const opts = options || {};
       const headers = Object.assign({
-        'apikey': SUPABASE_ANON_KEY.trim(),
-        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY.trim(),
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
         'Content-Type': 'application/json'
       }, opts.headers || {});
 
-      let res;
-      for (let attempt = 1; attempt <= 3; attempt++) {
+      const channels = activeChannel === 'yandex' ? ['yandex', 'direct'] : ['direct', 'yandex'];
+      let res = null;
+      let lastErr = null;
+
+      for (const ch of channels) {
         try {
-          res = await fetch(fullUrl, Object.assign({}, opts, { headers }));
+          res = await fetch(buildUrl(path, ch), Object.assign({}, opts, { headers }));
+          activeChannel = ch;
           break;
-        } catch (netErr) {
-          if (attempt === 3) throw netErr;
-          await new Promise(r => setTimeout(r, 800));
+        } catch (e) {
+          lastErr = e;
         }
       }
+
+      if (!res) throw lastErr || new Error('Нет соединения с сервером');
 
       const txt = await res.text();
       let data = null;
