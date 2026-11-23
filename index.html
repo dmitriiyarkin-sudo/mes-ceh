@@ -43,7 +43,7 @@
       <button id="btnLogin" class="btn btn-primary" style="width:100%;padding:11px;font-size:15px;" onclick="doLogin()">Войти в систему</button>
       <p id="loginErr" style="color:#dc2626;font-size:13px;font-weight:600;margin-top:12px;"></p>
       <div style="margin-top:20px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;">
-        Офис / Рук. — <b>1111</b> | ОТК Алексей — <b>2222</b> | Цеха — <b>1001..1005</b>
+        Доступ только для сотрудников производства
       </div>
     </div>
   </div>
@@ -69,7 +69,6 @@
       </div>
     </header>
     <main style="max-width:1360px;margin:0 auto;padding:16px;">
-      <!-- 1. ЦЕХА И СМЕНЫ -->
       <div id="tab-schedule">
         <div class="card no-print" style="padding:14px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;">
           <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
@@ -98,7 +97,6 @@
         <div id="workersGrid" class="grid-cards"></div>
       </div>
 
-      <!-- 2. СКЛАД ГОТОВОЙ ПРОДУКЦИИ И ПРОДАЖИ -->
       <div id="tab-fg" class="hidden">
         <div class="grid-2" style="margin-bottom:16px;">
           <div class="card" style="padding:16px;">
@@ -132,7 +130,6 @@
         </div>
       </div>
 
-      <!-- 3. СКЛАД МАТЕРИАЛОВ И ТЕХКАРТЫ (BOM) -->
       <div id="tab-mat" class="hidden">
         <div class="grid-2" style="margin-bottom:16px;">
           <div class="card" style="padding:16px;">
@@ -179,7 +176,6 @@
           <table><thead><tr><th>Категория</th><th>Наименование материала</th><th class="tc">Остаток</th><th class="tc">Мин. порог</th><th class="tc">Статус</th></tr></thead><tbody id="matStockBody"></tbody></table>
         </div>
       </div>
-      <!-- 4. ОТЧЕТ И ABC-АНАЛИЗ -->
       <div id="tab-report" class="hidden">
         <div class="card" style="padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
           <b>Выберите месяц отчета:</b>
@@ -200,7 +196,6 @@
         </div>
       </div>
 
-      <!-- 5. ПРОГНОЗ 7 ДНЕЙ -->
       <div id="tab-forecast" class="hidden">
         <div class="card" style="padding:16px;">
           <h3 style="margin-top:0;margin-bottom:4px;">Прогноз выпуска на ближайшие 7 дней (по базе за 28 дней)</h3>
@@ -211,7 +206,6 @@
         </div>
       </div>
 
-      <!-- 6. СПРАВОЧНИКИ И ШТАТ -->
       <div id="tab-catalog" class="hidden">
         <div class="grid-2">
           <div class="card" style="padding:16px;">
@@ -238,15 +232,16 @@
             </div>
           </div>
           <div class="card" style="padding:16px;">
-            <h3 style="margin-top:0;">Штат по подразделениям и PIN-коды</h3>
-            <table><thead><tr><th>Сотрудник</th><th>Подразделение</th><th>PIN</th><th>Норма</th></tr></thead><tbody id="catWorkersBody"></tbody></table>
+            <h3 style="margin-top:0;">Штат по подразделениям и управление PIN-кодами</h3>
+            <div style="overflow-x:auto;">
+              <table><thead><tr><th>Сотрудник</th><th>Подразделение</th><th>PIN</th><th class="tc">Норма</th><th class="tc">Доступ</th></tr></thead><tbody id="catWorkersBody"></tbody></table>
+            </div>
           </div>
         </div>
       </div>
     </main>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО ЗАДАНИЯ -->
   <div id="taskModal" class="modal-bg hidden no-print">
     <div class="card" style="max-width:430px;width:100%;padding:22px;">
       <h3 id="modalTitle" style="margin:0 0 4px;">Новое задание</h3>
@@ -269,7 +264,7 @@
     </div>
   </div>
   <script>
-    const SUPABASE_URL = 'https://roskresla-db.dmitriiyarkin.workers.dev';
+    const YANDEX_PROXY_URL = 'https://yandexcloud.net';
     const SUPABASE_ANON_KEY = 'sb_publishable_PlxBXL2o1RQttVyIz3YYXA_x5nWq52f';
 
     let state = {
@@ -280,12 +275,17 @@
 
     async function sbFetch(path, options) {
       const opts = options || {};
+      const parts = path.split('?');
+      const tableOrRpc = parts.shift();
+      const queryPart = parts.join('?');
+      const fullUrl = YANDEX_PROXY_URL.trim() + '?p=' + encodeURIComponent(tableOrRpc) + (queryPart ? '&' + queryPart : '');
+
       const headers = Object.assign({
         'apikey': SUPABASE_ANON_KEY.trim(),
         'Authorization': 'Bearer ' + SUPABASE_ANON_KEY.trim(),
         'Content-Type': 'application/json'
       }, opts.headers || {});
-      const res = await fetch(SUPABASE_URL.trim() + '/rest/v1/' + path, Object.assign({}, opts, { headers }));
+      const res = await fetch(fullUrl, Object.assign({}, opts, { headers }));
       const txt = await res.text();
       let data = null;
       try { data = txt ? JSON.parse(txt) : null; } catch (e) { data = txt; }
@@ -761,7 +761,8 @@
     async function addWorker() {
       const name = el('nwName').value.trim();
       const pin = el('nwPin').value.trim();
-      if (!name || pin.length !== 4) { alert('Укажите имя и 4-значный PIN-код.'); return; }
+      if (!name || !/^\d{4}$/.test(pin)) { alert('Укажите имя и ровно 4 цифры PIN-кода.'); return; }
+      if (state.workers.some(w => String(w.pin_code) === pin)) { alert('Этот PIN-код уже занят другим сотрудником!'); return; }
       const lim = Number(el('nwLimit').value);
       await sbFetch('workers', {
         method: 'POST',
@@ -777,10 +778,30 @@
       alert('Сотрудник добавлен!');
     }
 
+    async function changeWorkerPin(workerId) {
+      const w = state.workers.find(x => x.id === workerId);
+      if (!w) return;
+      const newPin = prompt('Введите новый 4-значный PIN-код для сотрудника «' + w.name + '»:', w.pin_code);
+      if (newPin === null) return;
+      const clean = String(newPin).trim();
+      if (!/^\d{4}$/.test(clean)) { alert('Ошибка: PIN-код должен состоять ровно из 4 цифр.'); return; }
+      if (state.workers.some(x => x.id !== workerId && String(x.pin_code) === clean)) {
+        alert('Этот PIN-код уже используется другим сотрудником!');
+        return;
+      }
+      try {
+        await sbFetch('workers?id=eq.' + workerId, { method: 'PATCH', body: JSON.stringify({ pin_code: clean }) });
+        w.pin_code = clean;
+        try { localStorage.removeItem('mes_catalog_v2'); } catch (e) {}
+        renderCatalogWorkers();
+        alert('Новый PIN-код для «' + w.name + '» успешно сохранен!');
+      } catch (err) { alert('Ошибка смены PIN: ' + err.message); }
+    }
+
     function renderCatalogWorkers() {
       el('catWorkersBody').innerHTML = state.workers.map(w => {
         const wsName = (state.workshops.find(x => x.id === w.workshop_id) || {}).name || '—';
-        return '<tr><td><b>' + w.name + '</b></td><td>' + wsName + '</td><td><code>' + w.pin_code + '</code></td><td><b>' + (w.max_per_day || '—') + '</b></td></tr>';
+        return '<tr><td><b>' + w.name + '</b></td><td>' + wsName + '</td><td><code>' + w.pin_code + '</code></td><td class="tc"><b>' + (w.max_per_day || '—') + '</b></td><td class="tc"><button class="btn btn-light" style="padding:3px 8px;font-size:11px;" onclick="changeWorkerPin(' + w.id + ')">🔑 Сменить PIN</button></td></tr>';
       }).join('');
     }
 
