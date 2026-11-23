@@ -27,11 +27,7 @@
     th { background: #f8fafc; font-weight: 700; }
     .tc { text-align: center; }
     .modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
-    @media print {
-      .no-print { display: none !important; }
-      body { background: #fff !important; }
-      .card { break-inside: avoid; border: 1px solid #000 !important; box-shadow: none !important; margin-bottom: 12px; }
-    }
+    @media print { .no-print { display: none !important; } body { background: #fff !important; } .card { break-inside: avoid; border: 1px solid #000 !important; box-shadow: none !important; margin-bottom: 12px; } }
   </style>
 </head>
 <body>
@@ -40,13 +36,10 @@
       <div style="width:54px;height:54px;background:#2563eb;color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:26px;">🏭</div>
       <h2 style="margin:0 0 6px;">ROSKRESLA ERP</h2>
       <p style="margin:0 0 20px;font-size:13px;color:#64748b;">Введите ваш персональный PIN-код</p>
-      <input type="password" id="pinInp" maxlength="4" placeholder="••••" onkeyup="if(event.key==='Enter')doLogin()"
-             style="width:100%;text-align:center;font-size:24px;letter-spacing:8px;font-weight:bold;margin-bottom:14px;">
+      <input type="password" id="pinInp" maxlength="4" placeholder="••••" onkeyup="if(event.key==='Enter')doLogin()" style="width:100%;text-align:center;font-size:24px;letter-spacing:8px;font-weight:bold;margin-bottom:14px;">
       <button id="btnLogin" class="btn btn-primary" style="width:100%;padding:11px;font-size:15px;" onclick="doLogin()">Войти в систему</button>
       <p id="loginErr" style="color:#dc2626;font-size:13px;font-weight:600;margin-top:12px;"></p>
-      <div style="margin-top:20px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;">
-        Доступ только для сотрудников производства
-      </div>
+      <div style="margin-top:20px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;">Доступ только для сотрудников производства</div>
     </div>
   </div>
 
@@ -98,7 +91,6 @@
         </div>
         <div id="workersGrid" class="grid-cards"></div>
       </div>
-
       <div id="tab-fg" class="hidden">
         <div class="grid-2" style="margin-bottom:16px;">
           <div class="card" style="padding:16px;">
@@ -131,7 +123,6 @@
           </div>
         </div>
       </div>
-
       <div id="tab-mat" class="hidden">
         <div class="grid-2" style="margin-bottom:16px;">
           <div class="card" style="padding:16px;">
@@ -197,7 +188,6 @@
           </div>
         </div>
       </div>
-
       <div id="tab-forecast" class="hidden">
         <div class="card" style="padding:16px;">
           <h3 style="margin-top:0;margin-bottom:4px;">Прогноз выпуска на ближайшие 7 дней (по базе за 28 дней)</h3>
@@ -207,7 +197,6 @@
           </div>
         </div>
       </div>
-
       <div id="tab-catalog" class="hidden">
         <div class="grid-2">
           <div class="card" style="padding:16px;">
@@ -243,7 +232,6 @@
       </div>
     </main>
   </div>
-
   <div id="taskModal" class="modal-bg hidden no-print">
     <div class="card" style="max-width:430px;width:100%;padding:22px;">
       <h3 id="modalTitle" style="margin:0 0 4px;">Новое задание</h3>
@@ -266,23 +254,18 @@
     </div>
   </div>
   <script>
-      <script>
     const YANDEX_PROXY_URL = 'https://' + 'functions.' + 'yandexcloud.net/' + 'd4eaok3ahk50paaqnbla';
     const DIRECT_SUPABASE_URL = 'https://' + 'zyviacyiefktjluhhdtf.' + 'supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_PlxBXL2o1RQttVyIz3YYXA_x5nWq52f';
 
     let activeChannel = 'yandex';
-
     let state = {
       user: null, workshops: [], shifts: [], workers: [], models: [], variants: [], allowances: [], tasks: [],
-      materials: [], bom: [], fgStock: [], salesOrders: [],
-      modalWorker: null, modalSlot: 1, editingTask: null
+      materials: [], bom: [], fgStock: [], salesOrders: [], modalWorker: null, modalSlot: 1, editingTask: null
     };
 
     function buildUrl(path, channel) {
-      if (channel === 'direct') {
-        return DIRECT_SUPABASE_URL + '/rest/v1/' + path;
-      }
+      if (channel === 'direct') return DIRECT_SUPABASE_URL + '/rest/v1/' + path;
       const parts = path.split('?');
       const tableOrRpc = parts.shift();
       const queryPart = parts.join('?');
@@ -300,17 +283,13 @@
       const channels = activeChannel === 'yandex' ? ['yandex', 'direct'] : ['direct', 'yandex'];
       let res = null;
       let lastErr = null;
-
       for (const ch of channels) {
         try {
           res = await fetch(buildUrl(path, ch), Object.assign({}, opts, { headers }));
           activeChannel = ch;
           break;
-        } catch (e) {
-          lastErr = e;
-        }
+        } catch (e) { lastErr = e; }
       }
-
       if (!res) throw lastErr || new Error('Нет соединения с сервером');
 
       const txt = await res.text();
@@ -334,7 +313,6 @@
       state.workers = data.workers || []; state.models = data.models || [];
       state.variants = data.variants || []; state.allowances = data.allowances || [];
       if (!state.workers.length) return false;
-
       const wOpts = state.workshops.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('');
       const mOpts = state.models.map(m => '<option value="' + m.id + '">' + m.name + '</option>').join('');
       el('selWorkshop').innerHTML = wOpts;
@@ -352,7 +330,6 @@
       el('repMonth').value = new Date().toISOString().slice(0, 7);
       const loginBtn = el('btnLogin');
       el('loginErr').innerText = '';
-
       try {
         const cached = localStorage.getItem('mes_catalog_v2');
         if (cached && applyCatalogData(JSON.parse(cached)) && loginBtn) {
@@ -684,6 +661,7 @@
         loadFinishedGoods();
       } catch (err) { alert(err.message); }
     }
+
     function onBomModelChange() {
       const mId = Number(el('bomModel').value);
       const vs = state.variants.filter(v => v.model_id === mId);
@@ -832,6 +810,7 @@
         return '<tr><td><b>' + w.name + '</b></td><td>' + wsName + '</td><td><code>' + w.pin_code + '</code></td><td class="tc"><b>' + (w.max_per_day || '—') + '</b></td><td class="tc"><button class="btn btn-light" style="padding:3px 8px;font-size:11px;" onclick="changeWorkerPin(' + w.id + ')">🔑 Сменить PIN</button></td></tr>';
       }).join('');
     }
+
     async function loadAnalytics() {
       const mStr = el('repMonth').value;
       const mTasks = await sbFetch('tasks?work_date=gte.' + mStr + '-01&work_date=lte.' + mStr + '-31&status=eq.active') || [];
