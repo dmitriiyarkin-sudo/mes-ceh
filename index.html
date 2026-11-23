@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MES Цех Обивки — Управление производством</title>
+  <title>ROSKRESLA ERP — Управление производством и складами</title>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
     body { margin: 0; background: #f1f5f9; color: #1e293b; }
@@ -13,13 +13,13 @@
     .btn-primary:disabled { background: #94a3b8; cursor: wait; }
     .btn-dark { background: #1e293b; color: #fff; } .btn-dark:hover { background: #0f172a; }
     .btn-amber { background: #d97706; color: #fff; } .btn-amber:hover { background: #b45309; }
-    .btn-green { background: #16a34a; color: #fff; padding: 4px 8px; font-size: 12px; }
+    .btn-green { background: #16a34a; color: #fff; padding: 5px 10px; font-size: 12px; }
     .btn-red { background: #fee2e2; color: #b91c1c; } .btn-light { background: #e2e8f0; color: #334155; }
     .btn-sm { padding: 4px 9px; font-size: 13px; background: #fff; border: 1px solid #cbd5e1; }
     input, select, textarea { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; font-size: 13px; background: #fff; }
     .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
     th { background: #f8fafc; font-weight: 700; }
@@ -36,28 +36,30 @@
   <div id="loginView" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;">
     <div class="card" style="max-width:360px;width:100%;padding:32px;text-align:center;">
       <div style="width:54px;height:54px;background:#2563eb;color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:26px;">🏭</div>
-      <h2 style="margin:0 0 6px;">Цех обивки — MES</h2>
+      <h2 style="margin:0 0 6px;">ROSKRESLA ERP</h2>
       <p style="margin:0 0 20px;font-size:13px;color:#64748b;">Введите ваш персональный PIN-код</p>
       <input type="password" id="pinInp" maxlength="4" placeholder="••••" onkeyup="if(event.key==='Enter')doLogin()"
              style="width:100%;text-align:center;font-size:24px;letter-spacing:8px;font-weight:bold;margin-bottom:14px;">
       <button id="btnLogin" class="btn btn-primary" style="width:100%;padding:11px;font-size:15px;" onclick="doLogin()">Войти в систему</button>
       <p id="loginErr" style="color:#dc2626;font-size:13px;font-weight:600;margin-top:12px;"></p>
       <div style="margin-top:20px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:12px;color:#94a3b8;">
-        Планировщик — <b>1111</b> | ОТК Алексей — <b>2222</b> | Обивщики — <b>1001..1005</b>
+        Офис / Рук. — <b>1111</b> | ОТК Алексей — <b>2222</b> | Цеха — <b>1001..1005</b>
       </div>
     </div>
   </div>
 
   <div id="appView" class="hidden">
     <header style="background:#0f172a;color:#fff;padding:10px 16px;" class="no-print">
-      <div style="max-width:1280px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;">
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
-          <span style="background:#2563eb;padding:4px 10px;border-radius:6px;font-weight:700;font-size:13px;">MES ЦЕХ</span>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="btn btn-primary" id="nav-schedule" onclick="switchTab('schedule')">📅 Сменные задания</button>
+      <div style="max-width:1360px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <span style="background:#2563eb;padding:4px 10px;border-radius:6px;font-weight:700;font-size:13px;">ROSKRESLA ERP</span>
+          <div style="display:flex;gap:5px;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="nav-schedule" onclick="switchTab('schedule')">📅 Цеха и смены</button>
+            <button class="btn btn-dark" id="nav-fg" onclick="switchTab('fg')">🏭 Склад ГП и продажи</button>
+            <button class="btn btn-dark" id="nav-mat" onclick="switchTab('mat')">📦 Материалы и техкарты</button>
             <button class="btn btn-dark" id="nav-report" onclick="switchTab('report')">📊 Отчет и ABC</button>
             <button class="btn btn-dark" id="nav-forecast" onclick="switchTab('forecast')">📈 Прогноз 7 дн.</button>
-            <button class="btn btn-dark hidden" id="nav-catalog" onclick="switchTab('catalog')">⚙️ Каталог и штат</button>
+            <button class="btn btn-dark hidden" id="nav-catalog" onclick="switchTab('catalog')">⚙️ Справочники</button>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;font-size:13px;">
@@ -66,12 +68,13 @@
         </div>
       </div>
     </header>
-    <main style="max-width:1280px;margin:0 auto;padding:16px;">
+    <main style="max-width:1360px;margin:0 auto;padding:16px;">
+      <!-- 1. ЦЕХА И СМЕНЫ -->
       <div id="tab-schedule">
         <div class="card no-print" style="padding:14px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;">
           <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
             <div>
-              <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">ЦЕХ</div>
+              <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">ПОДРАЗДЕЛЕНИЕ (ЦЕХ)</div>
               <select id="selWorkshop" onchange="loadTasks()"></select>
             </div>
             <div>
@@ -95,6 +98,88 @@
         <div id="workersGrid" class="grid-cards"></div>
       </div>
 
+      <!-- 2. СКЛАД ГОТОВОЙ ПРОДУКЦИИ И ПРОДАЖИ -->
+      <div id="tab-fg" class="hidden">
+        <div class="grid-2" style="margin-bottom:16px;">
+          <div class="card" style="padding:16px;">
+            <h3 style="margin-top:0;">Оформить продажу / резерв со склада ГП</h3>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="soNum" placeholder="№ заказа (напр. ЗК-104)" style="flex:1;">
+                <input type="text" id="soCust" placeholder="Клиент / Маркетплейс" style="flex:2;">
+              </div>
+              <select id="soModel" onchange="onSoModelChange()"></select>
+              <div style="display:flex;gap:8px;">
+                <select id="soVar" style="flex:2;"></select>
+                <input type="number" id="soQty" min="1" value="1" placeholder="Кол-во" style="flex:1;font-weight:700;">
+              </div>
+              <button class="btn btn-primary" onclick="createSaleOrder()">Поставить в резерв со свободных остатков</button>
+              <p id="soErr" style="color:#dc2626;font-size:12px;font-weight:700;margin:0;"></p>
+            </div>
+          </div>
+          <div class="card" style="padding:16px;">
+            <h3 style="margin-top:0;">Свободные остатки склада готовой продукции</h3>
+            <div style="max-height:260px;overflow-y:auto;">
+              <table><thead><tr><th>Модель</th><th>Обивка и цвет</th><th class="tc">Всего</th><th class="tc">Резерв</th><th class="tc" style="color:#15803d;">Свободно</th></tr></thead><tbody id="fgStockBody"></tbody></table>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding:16px;">
+          <h3 style="margin-top:0;">Заказы на отгрузку (Отдел комплектации и отгрузки)</h3>
+          <div style="overflow-x:auto;">
+            <table><thead><tr><th>№ Заказа</th><th>Покупатель</th><th>Модель и обивка</th><th class="tc">Кол-во</th><th class="tc">Статус</th><th class="tc">Действие</th></tr></thead><tbody id="soOrdersBody"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. СКЛАД МАТЕРИАЛОВ И ТЕХКАРТЫ (BOM) -->
+      <div id="tab-mat" class="hidden">
+        <div class="grid-2" style="margin-bottom:16px;">
+          <div class="card" style="padding:16px;">
+            <h3 style="margin-top:0;">Новый материал / Приход от поставщика</h3>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #e2e8f0;">
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="mName" placeholder="Название (напр. Экокожа чёрная)" style="flex:2;">
+                <select id="mCat" style="flex:1;"><option>Обивка</option><option>Каркас</option><option>Комплектующие</option><option>Упаковка</option></select>
+                <select id="mUnit" style="width:75px;"><option>м</option><option>шт.</option><option>кг</option></select>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <input type="number" id="mInitQty" step="0.01" placeholder="Нач. остаток" style="flex:1;">
+                <input type="number" id="mMinQty" step="0.01" placeholder="Мин. запас" style="flex:1;">
+                <button class="btn btn-primary" onclick="addMaterial()">+ В справочник</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <select id="inMatSel" style="flex:2;"></select>
+              <input type="number" id="inMatQty" step="0.01" placeholder="+ Приход" style="width:105px;">
+              <button class="btn btn-green" style="padding:8px 12px;" onclick="receiveMaterial()">Оприходовать</button>
+            </div>
+          </div>
+
+          <div class="card" style="padding:16px;">
+            <h3 style="margin-top:0;">Техкарты (нормы автосписания на 1 кресло)</h3>
+            <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;">
+              <div style="display:flex;gap:8px;">
+                <select id="bomModel" onchange="onBomModelChange()" style="flex:1;"></select>
+                <select id="bomVar" style="flex:1;"></select>
+              </div>
+              <div style="display:flex;gap:8px;">
+                <select id="bomMat" style="flex:2;"></select>
+                <input type="number" id="bomQty" step="0.001" placeholder="Норма (напр. 1.8)" style="width:130px;">
+                <button class="btn btn-primary" onclick="addBomItem()">+ В техкарту</button>
+              </div>
+            </div>
+            <div style="max-height:150px;overflow-y:auto;">
+              <table><thead><tr><th>Модель / Вариант</th><th>Материал</th><th class="tc">Норма</th><th></th></tr></thead><tbody id="bomBody"></tbody></table>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding:16px;">
+          <h3 style="margin-top:0;">Текущие остатки склада материалов</h3>
+          <table><thead><tr><th>Категория</th><th>Наименование материала</th><th class="tc">Остаток</th><th class="tc">Мин. порог</th><th class="tc">Статус</th></tr></thead><tbody id="matStockBody"></tbody></table>
+        </div>
+      </div>
+      <!-- 4. ОТЧЕТ И ABC-АНАЛИЗ -->
       <div id="tab-report" class="hidden">
         <div class="card" style="padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
           <b>Выберите месяц отчета:</b>
@@ -102,7 +187,7 @@
         </div>
         <div class="grid-2">
           <div class="card" style="padding:16px;">
-            <h3 style="margin-top:0;">Выработка по обивщикам</h3>
+            <h3 style="margin-top:0;">Выработка по сотрудникам</h3>
             <table><thead><tr><th>Сотрудник</th><th class="tc">План</th><th class="tc">Принято</th></tr></thead><tbody id="repWorkersBody"></tbody></table>
           </div>
           <div class="card" style="padding:16px;">
@@ -115,6 +200,7 @@
         </div>
       </div>
 
+      <!-- 5. ПРОГНОЗ 7 ДНЕЙ -->
       <div id="tab-forecast" class="hidden">
         <div class="card" style="padding:16px;">
           <h3 style="margin-top:0;margin-bottom:4px;">Прогноз выпуска на ближайшие 7 дней (по базе за 28 дней)</h3>
@@ -125,24 +211,42 @@
         </div>
       </div>
 
+      <!-- 6. СПРАВОЧНИКИ И ШТАТ -->
       <div id="tab-catalog" class="hidden">
         <div class="grid-2">
           <div class="card" style="padding:16px;">
             <h3 style="margin-top:0;">Добавить вариант обивки к модели</h3>
-            <div style="display:flex;flex-direction:column;gap:10px;">
-              <label><b>Модель кресла:</b><br><select id="catModelSel" style="width:100%;margin-top:4px;"></select></label>
-              <label><b>Новый вариант обивки и цвета:</b><br><input type="text" id="newVarInp" placeholder="Например: велюр изумрудный" style="width:100%;margin-top:4px;"></label>
-              <button class="btn btn-primary" onclick="addVariant()">Добавить обивку</button>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid #e2e8f0;">
+              <select id="catModelSel"></select>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="newVarInp" placeholder="Новый вариант обивки и цвета" style="flex:1;">
+                <button class="btn btn-primary" onclick="addVariant()">Добавить</button>
+              </div>
+            </div>
+            <h3 style="margin-top:0;">Добавить сотрудника в подразделение</h3>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="nwName" placeholder="Имя сотрудника" style="flex:2;">
+                <input type="text" id="nwPin" maxlength="4" placeholder="PIN (4 цифры)" style="flex:1;">
+              </div>
+              <div style="display:flex;gap:8px;">
+                <select id="nwWorkshop" style="flex:2;"></select>
+                <select id="nwRole" style="flex:1;"><option value="worker">Мастер цеха</option><option value="otk">ОТК</option><option value="admin">Офис / Рук.</option></select>
+                <input type="number" id="nwLimit" placeholder="Норма/день" style="width:110px;">
+              </div>
+              <button class="btn btn-primary" onclick="addWorker()">+ Добавить сотрудника</button>
             </div>
           </div>
           <div class="card" style="padding:16px;">
-            <h3 style="margin-top:0;">Штат, PIN-коды и дневные нормы</h3>
-            <table><thead><tr><th>Сотрудник</th><th>Роль</th><th>PIN</th><th>Норма/день</th></tr></thead><tbody id="catWorkersBody"></tbody></table>
+            <h3 style="margin-top:0;">Штат по подразделениям и PIN-коды</h3>
+            <table><thead><tr><th>Сотрудник</th><th>Подразделение</th><th>PIN</th><th>Норма</th></tr></thead><tbody id="catWorkersBody"></tbody></table>
           </div>
         </div>
       </div>
     </main>
   </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО ЗАДАНИЯ -->
   <div id="taskModal" class="modal-bg hidden no-print">
     <div class="card" style="max-width:430px;width:100%;padding:22px;">
       <h3 id="modalTitle" style="margin:0 0 4px;">Новое задание</h3>
@@ -165,11 +269,12 @@
     </div>
   </div>
   <script>
-    const SUPABASE_URL = 'https://zyviacyiefktjluhhdtf.supabase.co';
+    const SUPABASE_URL = 'https://supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_PlxBXL2o1RQttVyIz3YYXA_x5nWq52f';
 
     let state = {
       user: null, workshops: [], shifts: [], workers: [], models: [], variants: [], allowances: [], tasks: [],
+      materials: [], bom: [], fgStock: [], salesOrders: [],
       modalWorker: null, modalSlot: 1, editingTask: null
     };
 
@@ -189,24 +294,29 @@
     }
 
     function el(id) { return document.getElementById(id); }
-    function roleName(r) { return r === 'admin' ? 'Руководитель' : (r === 'otk' ? 'ОТК / Ст. мастер' : 'Обивщик'); }
+    function roleName(r) { return r === 'admin' ? 'Офис / Рук.' : (r === 'otk' ? 'ОТК / Ст. мастер' : 'Мастер цеха'); }
     function fmtDateRu(iso) {
       const p = String(iso).split('-');
       if (p.length !== 3) return iso;
       const y = p.shift(); const m = p.shift(); const d = p.shift();
       return d + '.' + m + '.' + y;
     }
+
     function applyCatalogData(data) {
-      state.workshops = data.workshops || [];
-      state.shifts = data.shifts || [];
-      state.workers = data.workers || [];
-      state.models = data.models || [];
-      state.variants = data.variants || [];
-      state.allowances = data.allowances || [];
+      state.workshops = data.workshops || []; state.shifts = data.shifts || [];
+      state.workers = data.workers || []; state.models = data.models || [];
+      state.variants = data.variants || []; state.allowances = data.allowances || [];
       if (!state.workers.length) return false;
-      el('selWorkshop').innerHTML = state.workshops.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('');
+
+      const wOpts = state.workshops.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('');
+      const mOpts = state.models.map(m => '<option value="' + m.id + '">' + m.name + '</option>').join('');
+      el('selWorkshop').innerHTML = wOpts;
+      el('nwWorkshop').innerHTML = wOpts;
       el('selShift').innerHTML = state.shifts.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
-      el('catModelSel').innerHTML = state.models.map(m => '<option value="' + m.id + '">' + m.name + '</option>').join('');
+      el('catModelSel').innerHTML = mOpts;
+      el('soModel').innerHTML = mOpts;
+      el('bomModel').innerHTML = mOpts;
+      onSoModelChange(); onBomModelChange();
       return true;
     }
 
@@ -217,13 +327,11 @@
       el('loginErr').innerText = '';
 
       try {
-        const cached = localStorage.getItem('mes_catalog_v1');
+        const cached = localStorage.getItem('mes_catalog_v2');
         if (cached && applyCatalogData(JSON.parse(cached)) && loginBtn) {
-          loginBtn.disabled = false;
-          loginBtn.innerText = 'Войти в систему';
+          loginBtn.disabled = false; loginBtn.innerText = 'Войти в систему';
         } else if (loginBtn) {
-          loginBtn.disabled = true;
-          loginBtn.innerText = '⏳ Подключение к базе...';
+          loginBtn.disabled = true; loginBtn.innerText = '⏳ Подключение к базе...';
         }
       } catch (e) {}
 
@@ -242,10 +350,8 @@
           variants: res.shift() || [], allowances: res.shift() || []
         };
         if (applyCatalogData(fresh)) {
-          try { localStorage.setItem('mes_catalog_v1', JSON.stringify(fresh)); } catch (e) {}
+          try { localStorage.setItem('mes_catalog_v2', JSON.stringify(fresh)); } catch (e) {}
           if (loginBtn) { loginBtn.disabled = false; loginBtn.innerText = 'Войти в систему'; }
-        } else {
-          el('loginErr').innerText = 'Список сотрудников пуст. Проверьте таблицу workers в Supabase.';
         }
       } catch (err) {
         if (!state.workers.length) {
@@ -268,6 +374,7 @@
       const isAdmin = found.role === 'admin';
       el('nav-catalog').classList.toggle('hidden', !isAdmin);
       el('btnRollover').classList.toggle('hidden', !isAdmin);
+      if (found.workshop_id) el('selWorkshop').value = found.workshop_id;
       renderCatalogWorkers();
       loadTasks();
       setInterval(() => { if (!el('appView').classList.contains('hidden')) loadTasks(); }, 10000);
@@ -280,13 +387,16 @@
     }
 
     function switchTab(name) {
-      ['schedule', 'report', 'forecast', 'catalog'].forEach(t => {
+      ['schedule', 'fg', 'mat', 'report', 'forecast', 'catalog'].forEach(t => {
         el('tab-' + t).classList.toggle('hidden', t !== name);
         const nb = el('nav-' + t);
         if (nb) { nb.className = (t === name) ? 'btn btn-primary' : 'btn btn-dark'; }
       });
+      if (name === 'fg') loadFinishedGoods();
+      if (name === 'mat') loadMaterialsData();
       if (name === 'report' || name === 'forecast') loadAnalytics();
     }
+
     function shiftDate(days) {
       const d = new Date(el('selDate').value);
       d.setDate(d.getDate() + days);
@@ -308,6 +418,10 @@
       const wId = Number(el('selWorkshop').value);
       let list = state.workers.filter(w => w.role === 'worker' && w.workshop_id === wId);
       if (state.user.role === 'worker') list = list.filter(w => w.id === state.user.id);
+      if (!list.length) {
+        el('workersGrid').innerHTML = '<div class="card" style="padding:20px;color:#64748b;">В этом подразделении пока нет назначенных мастеров. Добавьте их во вкладке «⚙️ Справочники».</div>';
+        return;
+      }
 
       const isAdmin = state.user.role === 'admin';
       const canOtk = isAdmin || state.user.role === 'otk';
@@ -357,7 +471,6 @@
         '</div>';
       }).join('');
     }
-
     async function changeAcc(taskId, nextVal, maxVal) {
       const clamped = Math.max(0, Math.min(maxVal, nextVal));
       const task = state.tasks.find(t => t.id === taskId);
@@ -370,13 +483,14 @@
         alert('Ошибка приёмки: ' + err.message);
       }
     }
+
     function openModal(workerId, slot, taskId) {
       state.modalWorker = state.workers.find(w => w.id === workerId);
       state.modalSlot = slot;
       state.editingTask = taskId ? state.tasks.find(t => t.id === taskId) : null;
       el('modalErr').innerText = ''; el('fReason').value = '';
       el('modalTitle').innerText = state.editingTask ? ('Редактирование слота #' + slot) : ('Новое задание (Слот #' + slot + ')');
-      el('modalSub').innerText = 'Обивщик: ' + state.modalWorker.name + ' | Дата: ' + fmtDateRu(el('selDate').value);
+      el('modalSub').innerText = 'Мастер: ' + state.modalWorker.name + ' | Дата: ' + fmtDateRu(el('selDate').value);
 
       const allowedIds = state.allowances.filter(a => a.worker_id === workerId).map(a => a.model_id);
       const allowedModels = allowedIds.length ? state.models.filter(m => allowedIds.includes(m.id)) : state.models;
@@ -404,7 +518,6 @@
       const vs = state.variants.filter(v => v.model_id === mId);
       el('fVariant').innerHTML = vs.map(v => '<option value="' + v.id + '">' + v.variant_name + '</option>').join('');
     }
-
     function closeModal() { el('taskModal').classList.add('hidden'); }
 
     async function saveTask() {
@@ -420,7 +533,7 @@
           .filter(t => t.worker_id === state.modalWorker.id && (!state.editingTask || t.id !== state.editingTask.id))
           .reduce((s, t) => s + t.plan_qty, 0);
         if (otherSum + qty > limit) {
-          el('modalErr').innerText = 'Превышен дневной лимит для ' + state.modalWorker.name + ': макс. ' + limit + ' шт. (уже ' + otherSum + ' шт.)';
+          el('modalErr').innerText = 'Превышен дневной лимит: макс. ' + limit + ' шт. (уже ' + otherSum + ' шт.)';
           return;
         }
       }
@@ -465,8 +578,7 @@
           });
           if (inserted && inserted.length) Object.assign(optimisticTask, inserted.shift());
         } catch (err) {
-          state.tasks = state.tasks.filter(t => t.id !== tempId);
-          renderWorkersGrid();
+          state.tasks = state.tasks.filter(t => t.id !== tempId); renderWorkersGrid();
           alert('Ошибка сохранения: ' + err.message);
         }
       }
@@ -487,6 +599,146 @@
         alert('Удаление отклонено сервером: ' + err.message);
       }
     }
+    function onSoModelChange() {
+      const mId = Number(el('soModel').value);
+      const vs = state.variants.filter(v => v.model_id === mId);
+      el('soVar').innerHTML = vs.map(v => '<option value="' + v.id + '">' + v.variant_name + '</option>').join('');
+    }
+
+    async function loadFinishedGoods() {
+      const [fg, orders] = await Promise.all([
+        sbFetch('finished_goods_stock?order=model_id'),
+        sbFetch('sales_orders?order=id.desc&limit=50')
+      ]);
+      state.fgStock = fg || [];
+      state.salesOrders = orders || [];
+
+      el('fgStockBody').innerHTML = state.fgStock.map(item => {
+        const mName = (state.models.find(m => m.id === item.model_id) || {}).name || '—';
+        const vName = (state.variants.find(v => v.id === item.variant_id) || {}).variant_name || '—';
+        const free = Math.max(0, item.physical_qty - item.reserved_qty);
+        return '<tr><td><b>' + mName + '</b></td><td>' + vName + '</td><td class="tc">' + item.physical_qty + '</td><td class="tc">' + item.reserved_qty + '</td><td class="tc" style="color:#15803d;font-weight:700;">' + free + '</td></tr>';
+      }).join('') || '<tr><td colspan="5" class="tc" style="color:#64748b;">На складе готовой продукции пока нет остатков</td></tr>';
+
+      el('soOrdersBody').innerHTML = state.salesOrders.map(o => {
+        const mName = (state.models.find(m => m.id === o.model_id) || {}).name || '—';
+        const vName = (state.variants.find(v => v.id === o.variant_id) || {}).variant_name || '—';
+        const stLabel = o.status === 'shipped' ? '<span style="color:#15803d;font-weight:700;">Отгружен</span>' : (o.status === 'cancelled' ? '<span style="color:#94a3b8;">Отменен</span>' : '<span style="color:#d97706;font-weight:700;">В резерве</span>');
+        const btns = o.status === 'reserved'
+          ? '<button class="btn btn-green" onclick="updateSaleStatus(' + o.id + ',\'shipped\')">Отгрузить</button> <button class="btn btn-red" style="padding:4px 8px;font-size:12px;" onclick="updateSaleStatus(' + o.id + ',\'cancelled\')">Отмена</button>'
+          : '—';
+        return '<tr><td><b>' + o.order_number + '</b></td><td>' + o.customer_name + '</td><td>' + mName + ' (' + vName + ')</td><td class="tc"><b>' + o.qty + '</b></td><td class="tc">' + stLabel + '</td><td class="tc">' + btns + '</td></tr>';
+      }).join('');
+    }
+
+    async function createSaleOrder() {
+      el('soErr').innerText = '';
+      const num = el('soNum').value.trim() || ('ЗК-' + Math.floor(100 + Math.random() * 900));
+      const cust = el('soCust').value.trim() || 'Покупатель';
+      const qty = Number(el('soQty').value);
+      try {
+        await sbFetch('sales_orders', {
+          method: 'POST',
+          body: JSON.stringify({
+            order_number: num, customer_name: cust,
+            model_id: Number(el('soModel').value), variant_id: Number(el('soVar').value),
+            qty: qty, status: 'reserved', created_by: state.user.name
+          })
+        });
+        el('soNum').value = ''; el('soCust').value = '';
+        loadFinishedGoods();
+      } catch (err) { el('soErr').innerText = err.message; }
+    }
+
+    async function updateSaleStatus(orderId, newStatus) {
+      try {
+        await sbFetch('sales_orders?id=eq.' + orderId, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
+        loadFinishedGoods();
+      } catch (err) { alert(err.message); }
+    }
+    function onBomModelChange() {
+      const mId = Number(el('bomModel').value);
+      const vs = state.variants.filter(v => v.model_id === mId);
+      el('bomVar').innerHTML = '<option value="">Все цвета модели (общая деталь)</option>' +
+        vs.map(v => '<option value="' + v.id + '">' + v.variant_name + '</option>').join('');
+    }
+
+    async function loadMaterialsData() {
+      const [mats, boms] = await Promise.all([
+        sbFetch('materials?is_active=eq.true&order=category,name'),
+        sbFetch('product_bom?order=id.desc')
+      ]);
+      state.materials = mats || [];
+      state.bom = boms || [];
+
+      const matOpts = state.materials.map(m => '<option value="' + m.id + '">' + m.name + ' (' + m.unit + ')</option>').join('');
+      el('inMatSel').innerHTML = matOpts;
+      el('bomMat').innerHTML = matOpts;
+
+      el('matStockBody').innerHTML = state.materials.map(m => {
+        const low = Number(m.stock_qty) <= Number(m.min_stock);
+        const st = low ? '<span style="color:#dc2626;font-weight:700;">⚠️ Мало</span>' : '<span style="color:#15803d;font-weight:700;">Норма</span>';
+        return '<tr style="' + (low ? 'background:#fef2f2;' : '') + '"><td>' + m.category + '</td><td><b>' + m.name + '</b></td><td class="tc"><b>' + m.stock_qty + ' ' + m.unit + '</b></td><td class="tc">' + m.min_stock + ' ' + m.unit + '</td><td class="tc">' + st + '</td></tr>';
+      }).join('') || '<tr><td colspan="5" class="tc" style="color:#64748b;">Добавьте первый материал сверху</td></tr>';
+
+      el('bomBody').innerHTML = state.bom.map(b => {
+        const mName = (state.models.find(m => m.id === b.model_id) || {}).name || '—';
+        const vName = b.variant_id ? ((state.variants.find(v => v.id === b.variant_id) || {}).variant_name || '') : 'Все варианты';
+        const mat = state.materials.find(x => x.id === b.material_id) || { name: '—', unit: '' };
+        return '<tr><td><b>' + mName + '</b><br><span style="font-size:11px;color:#64748b;">' + vName + '</span></td><td>' + mat.name + '</td><td class="tc"><b>' + b.qty_per_unit + ' ' + mat.unit + '</b></td><td class="tc"><button class="btn btn-red" style="padding:2px 6px;font-size:11px;" onclick="delBomItem(' + b.id + ')">✕</button></td></tr>';
+      }).join('');
+    }
+
+    async function addMaterial() {
+      const name = el('mName').value.trim();
+      if (!name) return;
+      await sbFetch('materials', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: name, category: el('mCat').value, unit: el('mUnit').value,
+          stock_qty: Number(el('mInitQty').value) || 0, min_stock: Number(el('mMinQty').value) || 0
+        })
+      });
+      el('mName').value = ''; el('mInitQty').value = ''; el('mMinQty').value = '';
+      loadMaterialsData();
+    }
+
+    async function receiveMaterial() {
+      const mId = Number(el('inMatSel').value);
+      const addQty = Number(el('inMatQty').value);
+      if (!mId || addQty <= 0) return;
+      const cur = state.materials.find(m => m.id === mId);
+      const nextQty = (Number(cur.stock_qty) || 0) + addQty;
+      await sbFetch('materials?id=eq.' + mId, { method: 'PATCH', body: JSON.stringify({ stock_qty: nextQty }) });
+      await sbFetch('material_movements', {
+        method: 'POST',
+        body: JSON.stringify({ material_id: mId, move_type: 'in', qty: addQty, reference_info: 'Приход на склад', created_by: state.user.name })
+      });
+      el('inMatQty').value = '';
+      loadMaterialsData();
+    }
+
+    async function addBomItem() {
+      const qty = Number(el('bomQty').value);
+      if (qty <= 0) return;
+      const vRaw = el('bomVar').value;
+      await sbFetch('product_bom', {
+        method: 'POST',
+        body: JSON.stringify({
+          model_id: Number(el('bomModel').value),
+          variant_id: vRaw ? Number(vRaw) : null,
+          material_id: Number(el('bomMat').value),
+          qty_per_unit: qty
+        })
+      });
+      el('bomQty').value = '';
+      loadMaterialsData();
+    }
+
+    async function delBomItem(id) {
+      await sbFetch('product_bom?id=eq.' + id, { method: 'DELETE' });
+      loadMaterialsData();
+    }
     async function runRollover() {
       try {
         const moved = await sbFetch('rpc/rollover_unaccepted_tasks', { method: 'POST', body: JSON.stringify({ p_src_date: el('selDate').value }) });
@@ -500,16 +752,38 @@
       if (!name) return;
       await sbFetch('model_variants', { method: 'POST', body: JSON.stringify({ model_id: Number(el('catModelSel').value), variant_name: name }) });
       state.variants = await sbFetch('model_variants?order=id') || [];
-      try { localStorage.removeItem('mes_catalog_v1'); } catch (e) {}
+      try { localStorage.removeItem('mes_catalog_v2'); } catch (e) {}
       el('newVarInp').value = '';
+      onSoModelChange(); onBomModelChange();
       alert('Вариант обивки добавлен!');
     }
 
-    function renderCatalogWorkers() {
-      el('catWorkersBody').innerHTML = state.workers.map(w =>
-        '<tr><td><b>' + w.name + '</b></td><td>' + roleName(w.role) + '</td><td><code>' + w.pin_code + '</code></td><td><b>' + (w.max_per_day || 'Без лимита') + '</b></td></tr>'
-      ).join('');
+    async function addWorker() {
+      const name = el('nwName').value.trim();
+      const pin = el('nwPin').value.trim();
+      if (!name || pin.length !== 4) { alert('Укажите имя и 4-значный PIN-код.'); return; }
+      const lim = Number(el('nwLimit').value);
+      await sbFetch('workers', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: name, pin_code: pin, workshop_id: Number(el('nwWorkshop').value),
+          default_shift_id: 1, role: el('nwRole').value, max_per_day: lim > 0 ? lim : null
+        })
+      });
+      state.workers = await sbFetch('workers?is_active=eq.true&order=id') || [];
+      try { localStorage.removeItem('mes_catalog_v2'); } catch (e) {}
+      el('nwName').value = ''; el('nwPin').value = ''; el('nwLimit').value = '';
+      renderCatalogWorkers();
+      alert('Сотрудник добавлен!');
     }
+
+    function renderCatalogWorkers() {
+      el('catWorkersBody').innerHTML = state.workers.map(w => {
+        const wsName = (state.workshops.find(x => x.id === w.workshop_id) || {}).name || '—';
+        return '<tr><td><b>' + w.name + '</b></td><td>' + wsName + '</td><td><code>' + w.pin_code + '</code></td><td><b>' + (w.max_per_day || '—') + '</b></td></tr>';
+      }).join('');
+    }
+
     async function loadAnalytics() {
       const mStr = el('repMonth').value;
       const mTasks = await sbFetch('tasks?work_date=gte.' + mStr + '-01&work_date=lte.' + mStr + '-31&status=eq.active') || [];
@@ -572,6 +846,7 @@
         '<tr><td><b>' + r.model + '</b></td><td>' + r.mat + '</td><td class="tc">' + r.w1 + '</td><td class="tc">' + r.avg3 + '</td><td class="tc">' + r.trend + '</td><td class="tc" style="background:#dbeafe;font-weight:700;">' + r.fc + '</td><td class="tc">' + r.next + '</td><td class="tc" style="color:#b91c1c;font-weight:700;">' + r.toPlan + '</td></tr>'
       ).join('');
     }
+
     window.addEventListener('DOMContentLoaded', bootstrap);
   </script>
 </body>
