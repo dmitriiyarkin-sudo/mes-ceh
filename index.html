@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ROSKRESLA ERP — Управление производством и складами</title>
+  <title>ROSKRESLA ERP — Управление производством и заказами</title>
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
     body { margin: 0; background: #f1f5f9; color: #1e293b; }
     .hidden { display: none !important; }
-    .btn { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; padding: 8px 14px; font-size: 13px; transition: 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn { cursor: pointer; border: none; border-radius: 8px; font-weight: 600; padding: 8px 14px; font-size: 13px; transition: 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
     .btn-primary { background: #2563eb; color: #fff; } .btn-primary:hover { background: #1d4ed8; }
     .btn-primary:disabled { background: #64748b; cursor: wait; }
     .btn-dark { background: #1e293b; color: #fff; } .btn-dark:hover { background: #0f172a; }
@@ -18,16 +18,23 @@
     .btn-sm { padding: 4px 9px; font-size: 13px; background: #fff; border: 1px solid #cbd5e1; }
     .spinner { width: 16px; height: 16px; border: 2.5px solid rgba(255,255,255,0.35); border-top-color: #fff; border-radius: 50%; animation: spin 0.75s linear infinite; display: inline-block; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    input, select, textarea { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; font-size: 13px; background: #fff; }
+    input, select, textarea { border: 1px solid #cbd5e1; border-radius: 8px; padding: 7px 10px; font-size: 13px; background: #fff; }
     .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
     .grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
     .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+    .sec-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.4px; margin: 10px 0 6px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
     th { background: #f8fafc; font-weight: 700; }
-    .tc { text-align: center; }
-    .modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
-    @media print { .no-print { display: none !important; } body { background: #fff !important; } .card { break-inside: avoid; border: 1px solid #000 !important; box-shadow: none !important; margin-bottom: 12px; } }
+    .tc { text-align: center; } .tr { text-align: right; }
+    .modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; overflow-y: auto; }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: #fff !important; }
+      .card { break-inside: avoid; border: 1px solid #000 !important; box-shadow: none !important; margin-bottom: 12px; }
+      .modal-bg { position: static !important; background: #fff !important; padding: 0 !important; }
+    }
   </style>
 </head>
 <body>
@@ -50,7 +57,7 @@
           <span style="background:#2563eb;padding:4px 10px;border-radius:6px;font-weight:700;font-size:13px;">ROSKRESLA ERP</span>
           <div style="display:flex;gap:5px;flex-wrap:wrap;">
             <button class="btn btn-primary" id="nav-schedule" onclick="switchTab('schedule')">📅 Цеха и смены</button>
-            <button class="btn btn-dark" id="nav-fg" onclick="switchTab('fg')">🏭 Склад ГП и продажи</button>
+            <button class="btn btn-dark" id="nav-fg" onclick="switchTab('fg')">🚚 Заказы, доставка и склад ГП</button>
             <button class="btn btn-dark" id="nav-mat" onclick="switchTab('mat')">📦 Материалы и техкарты</button>
             <button class="btn btn-dark" id="nav-report" onclick="switchTab('report')">📊 Отчет и ABC</button>
             <button class="btn btn-dark" id="nav-forecast" onclick="switchTab('forecast')">📈 Прогноз 7 дн.</button>
@@ -63,6 +70,7 @@
         </div>
       </div>
     </header>
+
     <main style="max-width:1360px;margin:0 auto;padding:16px;">
       <div id="tab-schedule">
         <div class="card no-print" style="padding:14px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;">
@@ -92,34 +100,53 @@
         <div id="workersGrid" class="grid-cards"></div>
       </div>
       <div id="tab-fg" class="hidden">
-        <div class="grid-2" style="margin-bottom:16px;">
-          <div class="card" style="padding:16px;">
-            <h3 style="margin-top:0;">Оформить продажу / резерв со склада ГП</h3>
-            <div style="display:flex;flex-direction:column;gap:8px;">
-              <div style="display:flex;gap:8px;">
-                <input type="text" id="soNum" placeholder="№ заказа (напр. ЗК-104)" style="flex:1;">
-                <input type="text" id="soCust" placeholder="Клиент / Маркетплейс" style="flex:2;">
-              </div>
-              <select id="soModel" onchange="onSoModelChange()"></select>
-              <div style="display:flex;gap:8px;">
-                <select id="soVar" style="flex:2;"></select>
-                <input type="number" id="soQty" min="1" value="1" placeholder="Кол-во" style="flex:1;font-weight:700;">
-              </div>
-              <button class="btn btn-primary" onclick="createSaleOrder()">Поставить в резерв со свободных остатков</button>
-              <p id="soErr" style="color:#dc2626;font-size:12px;font-weight:700;margin:0;"></p>
-            </div>
+        <div class="card no-print" style="padding:14px;margin-bottom:16px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;">
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+            <b>Журнал заказов и доставки</b>
+            <input type="date" id="fltSoDate" onchange="renderOrdersTable()" title="Фильтр по дате">
+            <input type="text" id="fltSoSearch" onkeyup="renderOrdersTable()" placeholder="Поиск (№, клиент, телефон, водитель)...">
+            <select id="fltSoStatus" onchange="renderOrdersTable()">
+              <option value="">Все статусы</option>
+              <option value="reserved">В резерве</option>
+              <option value="preorder">В производство</option>
+              <option value="shipped">Отгружен</option>
+              <option value="cancelled">Отменен</option>
+            </select>
           </div>
-          <div class="card" style="padding:16px;">
-            <h3 style="margin-top:0;">Свободные остатки склада готовой продукции</h3>
-            <div style="max-height:260px;overflow-y:auto;">
-              <table><thead><tr><th>Модель</th><th>Обивка и цвет</th><th class="tc">Всего</th><th class="tc">Резерв</th><th class="tc" style="color:#15803d;">Свободно</th></tr></thead><tbody id="fgStockBody"></tbody></table>
-            </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-light" onclick="exportOrdersCsv()">📥 Скачать Excel (CSV)</button>
+            <button class="btn btn-primary" onclick="openOrderModal(null)">+ Новый заказ</button>
           </div>
         </div>
-        <div class="card" style="padding:16px;">
-          <h3 style="margin-top:0;">Заказы на отгрузку (Отдел комплектации и отгрузки)</h3>
+
+        <div class="card" style="padding:16px;margin-bottom:16px;">
           <div style="overflow-x:auto;">
-            <table><thead><tr><th>№ Заказа</th><th>Покупатель</th><th>Модель и обивка</th><th class="tc">Кол-во</th><th class="tc">Статус</th><th class="tc">Действие</th></tr></thead><tbody id="soOrdersBody"></tbody></table>
+            <table>
+              <thead>
+                <tr>
+                  <th>№ / Дата</th>
+                  <th>Клиент / Тел.</th>
+                  <th>Кресло / Цвет / Комплект.</th>
+                  <th class="tc">Шт.</th>
+                  <th>Доставка и адрес</th>
+                  <th class="tr">Сумма / Оплата</th>
+                  <th>Менеджер / Водитель</th>
+                  <th class="tc">Статус</th>
+                  <th class="tc no-print">Действия</th>
+                </tr>
+              </thead>
+              <tbody id="soOrdersBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card" style="padding:16px;">
+          <h3 style="margin-top:0;">Свободные остатки склада готовой продукции (ГП)</h3>
+          <div style="max-height:240px;overflow-y:auto;">
+            <table>
+              <thead><tr><th>Модель</th><th>Обивка и цвет</th><th class="tc">Всего</th><th class="tc">Резерв</th><th class="tc" style="color:#15803d;">Свободно</th></tr></thead>
+              <tbody id="fgStockBody"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -169,6 +196,7 @@
           <table><thead><tr><th>Категория</th><th>Наименование материала</th><th class="tc">Остаток</th><th class="tc">Мин. порог</th><th class="tc">Статус</th></tr></thead><tbody id="matStockBody"></tbody></table>
         </div>
       </div>
+      <!-- Вкладка: Отчет и ABC -->
       <div id="tab-report" class="hidden">
         <div class="card" style="padding:14px;margin-bottom:16px;display:flex;align-items:center;gap:12px;">
           <b>Выберите месяц отчета:</b>
@@ -189,19 +217,21 @@
         </div>
       </div>
 
+      <!-- Вкладка: Прогноз 7 дней -->
       <div id="tab-forecast" class="hidden">
         <div class="card" style="padding:16px;">
-          <h3 style="margin-top:0;margin-bottom:4px;">Прогноз выпуска на ближайшие 7 дней (по базе за 28 дней)</h3>
-          <p style="font-size:12px;color:#64748b;margin-top:0;">50% выпуск прошлой недели + 50% средний недельный выпуск за 3 предшествующие недели</p>
+          <h3 style="margin-top:0;margin-bottom:4px;">Прогноз выпуска на ближайшие 7 дней</h3>
           <div style="overflow-x:auto;">
             <table><thead><tr><th>Модель</th><th>Обивка и цвет</th><th class="tc">Прошлая нед.</th><th class="tc">Средн. 3 нед.</th><th class="tc">Тренд</th><th class="tc" style="background:#dbeafe;">Прогноз 7 дн.</th><th class="tc">В плане</th><th class="tc" style="color:#b91c1c;">Допланировать</th></tr></thead><tbody id="fcBody"></tbody></table>
           </div>
         </div>
       </div>
+
+      <!-- Вкладка: Справочники -->
       <div id="tab-catalog" class="hidden">
         <div class="grid-2">
           <div class="card" style="padding:16px;">
-            <h3 style="margin-top:0;">Добавить вариант обивки к модели</h3>
+            <h3 style="margin-top:0;">Добавить вариант обивки и сотрудника</h3>
             <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid #e2e8f0;">
               <select id="catModelSel"></select>
               <div style="display:flex;gap:8px;">
@@ -209,11 +239,10 @@
                 <button class="btn btn-primary" onclick="addVariant()">Добавить</button>
               </div>
             </div>
-            <h3 style="margin-top:0;">Добавить сотрудника в подразделение</h3>
             <div style="display:flex;flex-direction:column;gap:8px;">
               <div style="display:flex;gap:8px;">
                 <input type="text" id="nwName" placeholder="Имя сотрудника" style="flex:2;">
-                <input type="text" id="nwPin" maxlength="4" placeholder="PIN (4 цифры)" style="flex:1;">
+                <input type="text" id="nwPin" maxlength="4" placeholder="PIN" style="flex:1;">
               </div>
               <div style="display:flex;gap:8px;">
                 <select id="nwWorkshop" style="flex:2;"></select>
@@ -224,7 +253,7 @@
             </div>
           </div>
           <div class="card" style="padding:16px;">
-            <h3 style="margin-top:0;">Штат по подразделениям и управление PIN-кодами</h3>
+            <h3 style="margin-top:0;">Штат и PIN-коды</h3>
             <div style="overflow-x:auto;">
               <table><thead><tr><th>Сотрудник</th><th>Подразделение</th><th>PIN</th><th class="tc">Норма</th><th class="tc">Доступ</th></tr></thead><tbody id="catWorkersBody"></tbody></table>
             </div>
@@ -233,7 +262,7 @@
       </div>
     </main>
   </div>
-
+  <!-- Модальное окно задания в цеху -->
   <div id="taskModal" class="modal-bg hidden no-print">
     <div class="card" style="max-width:430px;width:100%;padding:22px;">
       <h3 id="modalTitle" style="margin:0 0 4px;">Новое задание</h3>
@@ -244,7 +273,7 @@
         <label><b>3. План (шт.):</b><br><input type="number" id="fQty" min="1" max="50" value="1" style="width:100%;margin-top:4px;font-weight:700;"></label>
         <div id="reasonBox" class="hidden" style="background:#fef2f2;border:1px solid #fca5a5;padding:10px;border-radius:8px;">
           <label style="font-size:12px;font-weight:700;color:#b91c1c;">⚠️ Прошло более 3 часов. Причина изменения (обязательно):</label>
-          <textarea id="fReason" rows="2" placeholder="Укажите причину правки или отмены..." style="width:100%;margin-top:4px;border-color:#fca5a5;"></textarea>
+          <textarea id="fReason" rows="2" placeholder="Укажите причину правки..." style="width:100%;margin-top:4px;border-color:#fca5a5;"></textarea>
         </div>
         <p id="modalErr" style="color:#dc2626;font-size:12px;font-weight:700;margin:0;"></p>
         <div style="display:flex;gap:8px;margin-top:6px;">
@@ -255,629 +284,72 @@
       </div>
     </div>
   </div>
-  <script>
-    const YANDEX_PROXY_URL = 'https://' + 'functions.' + 'yandexcloud.net/' + 'd4eaok3ahk50paaqnbla';
-    const DIRECT_SUPABASE_URL = 'https://' + 'zyviacyiefktjluhhdtf.' + 'supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_PlxBXL2o1RQttVyIz3YYXA_x5nWq52f';
 
-    let activeChannel = 'yandex';
-    let state = {
-      user: null, workshops: [], shifts: [], workers: [], models: [], variants: [], allowances: [], tasks: [],
-      materials: [], bom: [], fgStock: [], salesOrders: [], modalWorker: null, modalSlot: 1, editingTask: null
-    };
+  <!-- Полная карточка заказа, доставки и взаиморасчетов (27 полей) -->
+  <div id="orderModal" class="modal-bg hidden">
+    <div class="card" style="max-width:760px;width:100%;padding:20px;margin:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h3 id="omTitle" style="margin:0;">Карточка заказа</h3>
+        <button class="btn btn-dark no-print" onclick="window.print()">🖨️ Печать квитанции</button>
+      </div>
 
-    function buildUrl(path, channel) {
-      const sep = path.includes('?') ? '&' : '?';
-      const pathWithKey = path + sep + 'apikey=' + encodeURIComponent(SUPABASE_ANON_KEY);
-      if (channel === 'direct') return DIRECT_SUPABASE_URL + '/rest/v1/' + pathWithKey;
-      const parts = pathWithKey.split('?');
-      const tableOrRpc = parts.shift();
-      const queryPart = parts.join('?');
-      return YANDEX_PROXY_URL + '?p=' + encodeURIComponent(tableOrRpc) + (queryPart ? '&' + queryPart : '');
-    }
+      <div class="sec-title">1. Основные данные и ответственные</div>
+      <div class="form-grid">
+        <label>№ Заказа<br><input type="text" id="oNum" placeholder="№" style="width:100%;"></label>
+        <label>Дата заказа<br><input type="date" id="oDate" style="width:100%;"></label>
+        <label>Менеджер<br><input type="text" id="oMgr" placeholder="ФИО менеджера" style="width:100%;"></label>
+        <label>Водитель<br><input type="text" id="oDrv" placeholder="ФИО водителя" style="width:100%;"></label>
+        <label>Источник обращения<br><input type="text" id="oSrc" list="srcList" placeholder="Авито, Сайт, Ozon..." style="width:100%;"></label>
+        <datalist id="srcList"><option value="Авито"><option value="Сайт"><option value="Ozon"><option value="Wildberries"><option value="Звонок / Рекомендация"></datalist>
+      </div>
 
-    async function sbFetch(path, options) {
-      const opts = options || {};
-      const headers = Object.assign({
-        'apikey': SUPABASE_ANON_KEY,
-        'Content-Type': 'application/json'
-      }, opts.headers || {});
+      <div class="sec-title">2. Клиент и состав заказа</div>
+      <div class="form-grid">
+        <label>Клиент<br><input type="text" id="oCust" placeholder="Имя покупателя" style="width:100%;"></label>
+        <label>Номер телефона<br><input type="text" id="oPhone" placeholder="+7 (___) ___-__-__" style="width:100%;"></label>
+        <label>Название кресла<br><select id="oModel" onchange="onOrderModelChange()" style="width:100%;"></select></label>
+        <label>Цвет и обивка<br><select id="oVar" style="width:100%;"></select></label>
+        <label>Комплектация<br><input type="text" id="oCfg" list="cfgList" placeholder="Стандарт / Подушки..." style="width:100%;"></label>
+        <datalist id="cfgList"><option value="Стандарт"><option value="С подушками"><option value="Усиленный механизм"><option value="Индивидуальная"></datalist>
+        <label>Кол-во (шт.)<br><input type="number" id="oQty" min="1" value="1" oninput="recalcOrderTotal()" style="width:100%;font-weight:700;"></label>
+        <label>Цена за ед. (₽)<br><input type="number" id="oPrice" min="0" step="10" value="0" oninput="recalcOrderTotal()" style="width:100%;"></label>
+        <label>Доставка (₽)<br><input type="number" id="oDeliv" min="0" step="10" value="0" oninput="recalcOrderTotal()" style="width:100%;"></label>
+      </div>
 
-      const channels = activeChannel === 'yandex' ? ['yandex', 'direct'] : ['direct', 'yandex'];
-      let res = null;
-      let lastErr = null;
-      for (const ch of channels) {
-        try {
-          res = await fetch(buildUrl(path, ch), Object.assign({}, opts, { headers }));
-          activeChannel = ch;
-          break;
-        } catch (e) { lastErr = e; }
-      }
-      if (!res) throw lastErr || new Error('Нет соединения с сервером');
+      <div class="sec-title">3. Адрес и время доставки</div>
+      <div class="form-grid">
+        <label>Город доставки<br><input type="text" id="oCity" placeholder="Город" style="width:100%;"></label>
+        <label>Улица<br><input type="text" id="oStreet" placeholder="Улица" style="width:100%;"></label>
+        <label>№ дома<br><input type="text" id="oHouse" placeholder="Дом" style="width:100%;"></label>
+        <label>Корпус<br><input type="text" id="oBldg" placeholder="Корп./Стр." style="width:100%;"></label>
+        <label>Подъезд<br><input type="text" id="oEntr" placeholder="Подъезд" style="width:100%;"></label>
+        <label>Этаж<br><input type="text" id="oFloor" placeholder="Этаж" style="width:100%;"></label>
+        <label>Квартира<br><input type="text" id="oApt" placeholder="Кв./Офис" style="width:100%;"></label>
+        <label>Время доставки<br><input type="text" id="oTime" placeholder="напр. 14:00 - 18:00" style="width:100%;"></label>
+      </div>
+      <div style="margin-top:8px;">
+        <label>Комментарий к заказу и доставке<br><input type="text" id="oComm" placeholder="Домофон, пропуск, особенности подъезда..." style="width:100%;"></label>
+      </div>
 
-      const txt = await res.text();
-      let data = null;
-      try { data = txt ? JSON.parse(txt) : null; } catch (e) { data = txt; }
-      if (!res.ok) throw new Error((data && data.message) ? data.message : ('Ошибка HTTP ' + res.status));
-      return data;
-    }
+      <div class="sec-title">4. Оплата, взаиморасчеты и касса водителя</div>
+      <div class="form-grid">
+        <label>Наличные (₽)<br><input type="number" id="oCash" min="0" step="10" value="0" oninput="recalcOrderTotal()" style="width:100%;"></label>
+        <label>Карта (₽)<br><input type="number" id="oCard" min="0" step="10" value="0" oninput="recalcOrderTotal()" style="width:100%;"></label>
+        <label>На счёт (₽)<br><input type="number" id="oBank" min="0" step="10" value="0" oninput="recalcOrderTotal()" style="width:100%;"></label>
+        <label>Сдано наличных (₽)<br><input type="number" id="oHanded" min="0" step="10" value="0" oninput="recalcOrderTotal()" style="width:100%;"></label>
+        <label>Расходы наличка (₽)<br><input type="number" id="oExp" min="0" step="10" value="0" oninput="recalcOrderTotal()" style="width:100%;"></label>
+      </div>
 
-    function el(id) { return document.getElementById(id); }
-    function roleName(r) { return r === 'admin' ? 'Офис / Рук.' : (r === 'otk' ? 'ОТК / Ст. мастер' : 'Мастер цеха'); }
-    function fmtDateRu(iso) {
-      const p = String(iso).split('-');
-      if (p.length !== 3) return iso;
-      const y = p.shift(); const m = p.shift(); const d = p.shift();
-      return d + '.' + m + '.' + y;
-    }
+      <div id="oSummaryBox" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:10px;margin-top:10px;font-size:13px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;"></div>
+      <p id="omErr" style="color:#dc2626;font-size:12px;font-weight:700;margin:6px 0 0;"></p>
 
-    function applyCatalogData(data) {
-      state.workshops = data.workshops || []; state.shifts = data.shifts || [];
-      state.workers = data.workers || []; state.models = data.models || [];
-      state.variants = data.variants || []; state.allowances = data.allowances || [];
-      if (!state.workers.length) return false;
-      const wOpts = state.workshops.map(w => '<option value="' + w.id + '">' + w.name + '</option>').join('');
-      const mOpts = state.models.map(m => '<option value="' + m.id + '">' + m.name + '</option>').join('');
-      el('selWorkshop').innerHTML = wOpts;
-      el('nwWorkshop').innerHTML = wOpts;
-      el('selShift').innerHTML = state.shifts.map(s => '<option value="' + s.id + '">' + s.name + '</option>').join('');
-      el('catModelSel').innerHTML = mOpts;
-      el('soModel').innerHTML = mOpts;
-      el('bomModel').innerHTML = mOpts;
-      onSoModelChange(); onBomModelChange();
-      return true;
-    }
+      <div class="no-print" style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-primary" style="flex:1;" onclick="saveOrderModal()">Сохранить заказ</button>
+        <button class="btn btn-light" onclick="closeOrderModal()">Закрыть</button>
+      </div>
+    </div>
+  </div>
 
-    async function bootstrap() {
-      el('selDate').value = new Date().toISOString().slice(0, 10);
-      el('repMonth').value = new Date().toISOString().slice(0, 7);
-      const loginBtn = el('btnLogin');
-      el('loginErr').innerText = '';
-      try {
-        const cached = localStorage.getItem('mes_catalog_v2');
-        if (cached && applyCatalogData(JSON.parse(cached)) && loginBtn) {
-          loginBtn.disabled = false; loginBtn.innerHTML = 'Войти в систему';
-        } else if (loginBtn) {
-          loginBtn.disabled = true;
-          loginBtn.innerHTML = '<span class="spinner"></span> Подключение к базе...';
-        }
-      } catch (e) {}
-
-      try {
-        const res = await Promise.all([
-          sbFetch('workshops?is_active=eq.true&order=id'),
-          sbFetch('shifts?order=sort_order'),
-          sbFetch('workers?is_active=eq.true&order=id'),
-          sbFetch('chair_models?is_active=eq.true&order=id'),
-          sbFetch('model_variants?order=id'),
-          sbFetch('worker_allowed_models')
-        ]);
-        const fresh = {
-          workshops: res.shift() || [], shifts: res.shift() || [],
-          workers: res.shift() || [], models: res.shift() || [],
-          variants: res.shift() || [], allowances: res.shift() || []
-        };
-        if (applyCatalogData(fresh)) {
-          try { localStorage.setItem('mes_catalog_v2', JSON.stringify(fresh)); } catch (e) {}
-          if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = 'Войти в систему'; }
-        }
-      } catch (err) {
-        if (!state.workers.length) {
-          el('loginErr').innerText = 'Нет связи с базой: ' + err.message;
-          if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = 'Повторить подключение'; }
-        }
-      }
-    }
-    function doLogin() {
-      if (!state.workers.length) { bootstrap(); return; }
-      const pin = el('pinInp').value.trim();
-      const found = state.workers.find(w => String(w.pin_code) === pin);
-      if (!found) { el('loginErr').innerText = 'Неверный PIN-код'; return; }
-      state.user = found;
-      el('loginErr').innerText = ''; el('pinInp').value = '';
-      el('loginView').classList.add('hidden');
-      el('appView').classList.remove('hidden');
-      el('userBadge').innerHTML = '👤 <b>' + found.name + '</b> (' + roleName(found.role) + ')';
-
-      const isAdmin = found.role === 'admin';
-      el('nav-catalog').classList.toggle('hidden', !isAdmin);
-      el('btnRollover').classList.toggle('hidden', !isAdmin);
-      if (found.workshop_id) el('selWorkshop').value = found.workshop_id;
-      renderCatalogWorkers();
-      loadTasks();
-      setInterval(() => { if (!el('appView').classList.contains('hidden')) loadTasks(); }, 10000);
-    }
-
-    function doLogout() {
-      state.user = null;
-      el('appView').classList.add('hidden');
-      el('loginView').classList.remove('hidden');
-    }
-
-    function switchTab(name) {
-      ['schedule', 'fg', 'mat', 'report', 'forecast', 'catalog'].forEach(t => {
-        el('tab-' + t).classList.toggle('hidden', t !== name);
-        const nb = el('nav-' + t);
-        if (nb) { nb.className = (t === name) ? 'btn btn-primary' : 'btn btn-dark'; }
-      });
-      if (name === 'fg') loadFinishedGoods();
-      if (name === 'mat') loadMaterialsData();
-      if (name === 'report' || name === 'forecast') loadAnalytics();
-    }
-
-    function shiftDate(days) {
-      const d = new Date(el('selDate').value);
-      d.setDate(d.getDate() + days);
-      el('selDate').value = d.toISOString().slice(0, 10);
-      loadTasks();
-    }
-
-    async function loadTasks() {
-      const d = el('selDate').value;
-      const wId = el('selWorkshop').value;
-      const sId = el('selShift').value;
-      try {
-        state.tasks = await sbFetch('tasks?work_date=eq.' + d + '&workshop_id=eq.' + wId + '&shift_id=eq.' + sId + '&status=eq.active') || [];
-        renderWorkersGrid();
-      } catch (e) { console.error(e); }
-    }
-
-    function renderWorkersGrid() {
-      const wId = Number(el('selWorkshop').value);
-      let list = state.workers.filter(w => w.role === 'worker' && w.workshop_id === wId);
-      if (state.user.role === 'worker') list = list.filter(w => w.id === state.user.id);
-      if (!list.length) {
-        el('workersGrid').innerHTML = '<div class="card" style="padding:20px;color:#64748b;">В этом подразделении пока нет назначенных мастеров. Добавьте их во вкладке «⚙️ Справочники».</div>';
-        return;
-      }
-
-      const isAdmin = state.user.role === 'admin';
-      const canOtk = isAdmin || state.user.role === 'otk';
-
-      el('workersGrid').innerHTML = list.map(w => {
-        const wTasks = state.tasks.filter(t => t.worker_id === w.id);
-        const planSum = wTasks.reduce((s, t) => s + t.plan_qty, 0);
-        const accSum = wTasks.reduce((s, t) => s + t.accepted_qty, 0);
-        const normTxt = w.max_per_day ? ' <span style="color:#1d4ed8;font-weight:700;">(Норма: ' + w.max_per_day + ')</span>' : '';
-
-        let slotsHtml = '';
-        for (let slot = 1; slot <= 6; slot++) {
-          const t = wTasks.find(x => x.slot_index === slot);
-          if (t) {
-            const mName = (state.models.find(m => m.id === t.model_id) || {}).name || '—';
-            const vName = (state.variants.find(v => v.id === t.variant_id) || {}).variant_name || '—';
-            const bg = t.accepted_qty >= t.plan_qty ? '#dcfce7;border-color:#4ade80' : (t.accepted_qty > 0 ? '#fef3c7;border-color:#fbbf24' : '#f8fafc;border-color:#cbd5e1');
-            const note = t.carryover_note ? '<span style="background:#fde68a;color:#78350f;padding:1px 6px;border-radius:4px;font-size:11px;margin-left:4px;">' + t.carryover_note + '</span>' : '';
-            const otkBtns = canOtk
-              ? '<button class="btn btn-sm" onclick="changeAcc(\'' + t.id + '\',' + (t.accepted_qty - 1) + ',' + t.plan_qty + ')">−</button>' +
-                '<b style="min-width:24px;text-align:center;color:#15803d;">' + t.accepted_qty + '</b>' +
-                '<button class="btn btn-sm" onclick="changeAcc(\'' + t.id + '\',' + (t.accepted_qty + 1) + ',' + t.plan_qty + ')">+</button>' +
-                '<button class="btn btn-green" onclick="changeAcc(\'' + t.id + '\',' + t.plan_qty + ',' + t.plan_qty + ')">Всё ✓</button>'
-              : '<b style="color:#15803d;">' + t.accepted_qty + ' из ' + t.plan_qty + '</b>';
-            const editBtn = isAdmin ? '<button class="btn btn-light" style="padding:3px 8px;font-size:11px;" onclick="openModal(' + w.id + ',' + slot + ',\'' + t.id + '\')">Изменить</button>' : '';
-
-            slotsHtml += '<div style="padding:10px;border:1px solid ' + bg + ';border-radius:8px;margin-bottom:8px;">' +
-              '<div style="display:flex;justify-content:space-between;gap:8px;">' +
-                '<div><b>' + slot + '. ' + mName + '</b>' + note + '<div style="font-size:12px;color:#475569;">' + vName + '</div></div>' +
-                '<span style="background:#fff;border:1px solid #cbd5e1;padding:2px 7px;border-radius:6px;font-size:12px;font-weight:700;height:fit-content;">План: ' + t.plan_qty + ' шт.</span>' +
-              '</div>' +
-              '<div class="no-print" style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.08);display:flex;justify-content:space-between;align-items:center;">' +
-                '<div style="display:flex;align-items:center;gap:4px;font-size:12px;"><span>Принято:</span>' + otkBtns + '</div>' + editBtn +
-              '</div>' +
-            '</div>';
-          } else if (isAdmin) {
-            slotsHtml += '<button onclick="openModal(' + w.id + ',' + slot + ',null)" class="no-print" style="width:100%;text-align:left;padding:7px 10px;margin-bottom:6px;border:1px dashed #cbd5e1;border-radius:8px;background:transparent;color:#64748b;cursor:pointer;font-size:12px;">+ Слот ' + slot + ' (назначить задание)</button>';
-          }
-        }
-
-        return '<div class="card" style="overflow:hidden;">' +
-          '<div style="padding:12px 14px;border-bottom:1px solid #e2e8f0;background:' + (w.color_hex || '#ebf3fa') + ';">' +
-            '<div style="font-weight:700;font-size:15px;">' + w.name + '</div>' +
-            '<div style="font-size:12px;color:#334155;">План: <b>' + planSum + '</b> шт. | Принято ОТК: <b style="color:#15803d;">' + accSum + '</b> шт.' + normTxt + '</div>' +
-          '</div>' +
-          '<div style="padding:12px;">' + slotsHtml + '</div>' +
-        '</div>';
-      }).join('');
-    }
-    async function changeAcc(taskId, nextVal, maxVal) {
-      const clamped = Math.max(0, Math.min(maxVal, nextVal));
-      const task = state.tasks.find(t => t.id === taskId);
-      const prevVal = task ? task.accepted_qty : 0;
-      if (task) { task.accepted_qty = clamped; renderWorkersGrid(); }
-      try {
-        await sbFetch('tasks?id=eq.' + taskId, { method: 'PATCH', body: JSON.stringify({ accepted_qty: clamped }) });
-      } catch (err) {
-        if (task) { task.accepted_qty = prevVal; renderWorkersGrid(); }
-        alert('Ошибка приёмки: ' + err.message);
-      }
-    }
-
-    function openModal(workerId, slot, taskId) {
-      state.modalWorker = state.workers.find(w => w.id === workerId);
-      state.modalSlot = slot;
-      state.editingTask = taskId ? state.tasks.find(t => t.id === taskId) : null;
-      el('modalErr').innerText = ''; el('fReason').value = '';
-      el('modalTitle').innerText = state.editingTask ? ('Редактирование слота #' + slot) : ('Новое задание (Слот #' + slot + ')');
-      el('modalSub').innerText = 'Мастер: ' + state.modalWorker.name + ' | Дата: ' + fmtDateRu(el('selDate').value);
-
-      const allowedIds = state.allowances.filter(a => a.worker_id === workerId).map(a => a.model_id);
-      const allowedModels = allowedIds.length ? state.models.filter(m => allowedIds.includes(m.id)) : state.models;
-      el('fModel').innerHTML = allowedModels.map(m => '<option value="' + m.id + '">' + m.name + '</option>').join('');
-
-      if (state.editingTask) {
-        el('fModel').value = state.editingTask.model_id;
-        onModalModelChange();
-        el('fVariant').value = state.editingTask.variant_id;
-        el('fQty').value = state.editingTask.plan_qty;
-        el('btnDelTask').classList.remove('hidden');
-        const over3h = (Date.now() - new Date(state.editingTask.created_at).getTime()) >= (3 * 60 * 60 * 1000);
-        el('reasonBox').classList.toggle('hidden', !over3h);
-      } else {
-        onModalModelChange();
-        el('fQty').value = 1;
-        el('btnDelTask').classList.add('hidden');
-        el('reasonBox').classList.add('hidden');
-      }
-      el('taskModal').classList.remove('hidden');
-    }
-
-    function onModalModelChange() {
-      const mId = Number(el('fModel').value);
-      const vs = state.variants.filter(v => v.model_id === mId);
-      el('fVariant').innerHTML = vs.map(v => '<option value="' + v.id + '">' + v.variant_name + '</option>').join('');
-    }
-    function closeModal() { el('taskModal').classList.add('hidden'); }
-
-    async function saveTask() {
-      el('modalErr').innerText = '';
-      const mId = Number(el('fModel').value);
-      const vId = Number(el('fVariant').value);
-      const qty = Number(el('fQty').value);
-      const reason = el('fReason').value.trim();
-
-      const limit = state.modalWorker.max_per_day;
-      if (limit && limit > 0) {
-        const otherSum = state.tasks
-          .filter(t => t.worker_id === state.modalWorker.id && (!state.editingTask || t.id !== state.editingTask.id))
-          .reduce((s, t) => s + t.plan_qty, 0);
-        if (otherSum + qty > limit) {
-          el('modalErr').innerText = 'Превышен дневной лимит: макс. ' + limit + ' шт. (уже ' + otherSum + ' шт.)';
-          return;
-        }
-      }
-
-      if (state.editingTask) {
-        const target = state.editingTask;
-        const backup = Object.assign({}, target);
-        target.model_id = mId; target.variant_id = vId; target.plan_qty = qty;
-        closeModal(); renderWorkersGrid();
-        try {
-          await sbFetch('rpc/update_task_with_reason', {
-            method: 'POST',
-            body: JSON.stringify({
-              p_task_id: target.id, p_model_id: mId, p_variant_id: vId,
-              p_plan_qty: qty, p_reason: reason, p_editor: state.user.name
-            })
-          });
-        } catch (err) {
-          Object.assign(target, backup); renderWorkersGrid();
-          alert('Изменение отклонено сервером: ' + err.message);
-        }
-      } else {
-        const tempId = 'temp_' + Date.now();
-        const optimisticTask = {
-          id: tempId, work_date: el('selDate').value, workshop_id: Number(el('selWorkshop').value),
-          shift_id: Number(el('selShift').value), worker_id: state.modalWorker.id,
-          slot_index: state.modalSlot, model_id: mId, variant_id: vId,
-          plan_qty: qty, accepted_qty: 0, created_at: new Date().toISOString(), created_by: state.user.name
-        };
-        state.tasks.push(optimisticTask);
-        closeModal(); renderWorkersGrid();
-        try {
-          const inserted = await sbFetch('tasks', {
-            method: 'POST',
-            headers: { 'Prefer': 'return=representation' },
-            body: JSON.stringify({
-              work_date: optimisticTask.work_date, workshop_id: optimisticTask.workshop_id,
-              shift_id: optimisticTask.shift_id, worker_id: optimisticTask.worker_id,
-              slot_index: optimisticTask.slot_index, model_id: mId, variant_id: vId,
-              plan_qty: qty, created_by: state.user.name
-            })
-          });
-          if (inserted && inserted.length) Object.assign(optimisticTask, inserted.shift());
-        } catch (err) {
-          state.tasks = state.tasks.filter(t => t.id !== tempId); renderWorkersGrid();
-          alert('Ошибка сохранения: ' + err.message);
-        }
-      }
-    }
-
-    async function deleteTask() {
-      const target = state.editingTask;
-      const reason = el('fReason').value.trim();
-      state.tasks = state.tasks.filter(t => t.id !== target.id);
-      closeModal(); renderWorkersGrid();
-      try {
-        await sbFetch('rpc/delete_task_with_reason', {
-          method: 'POST',
-          body: JSON.stringify({ p_task_id: target.id, p_reason: reason, p_editor: state.user.name })
-        });
-      } catch (err) {
-        state.tasks.push(target); renderWorkersGrid();
-        alert('Удаление отклонено сервером: ' + err.message);
-      }
-    }
-    function onSoModelChange() {
-      const mId = Number(el('soModel').value);
-      const vs = state.variants.filter(v => v.model_id === mId);
-      el('soVar').innerHTML = vs.map(v => '<option value="' + v.id + '">' + v.variant_name + '</option>').join('');
-    }
-
-    async function loadFinishedGoods() {
-      const [fg, orders] = await Promise.all([
-        sbFetch('finished_goods_stock?order=model_id'),
-        sbFetch('sales_orders?order=id.desc&limit=50')
-      ]);
-      state.fgStock = fg || [];
-      state.salesOrders = orders || [];
-
-      el('fgStockBody').innerHTML = state.fgStock.map(item => {
-        const mName = (state.models.find(m => m.id === item.model_id) || {}).name || '—';
-        const vName = (state.variants.find(v => v.id === item.variant_id) || {}).variant_name || '—';
-        const free = Math.max(0, item.physical_qty - item.reserved_qty);
-        return '<tr><td><b>' + mName + '</b></td><td>' + vName + '</td><td class="tc">' + item.physical_qty + '</td><td class="tc">' + item.reserved_qty + '</td><td class="tc" style="color:#15803d;font-weight:700;">' + free + '</td></tr>';
-      }).join('') || '<tr><td colspan="5" class="tc" style="color:#64748b;">На складе готовой продукции пока нет остатков</td></tr>';
-
-      el('soOrdersBody').innerHTML = state.salesOrders.map(o => {
-        const mName = (state.models.find(m => m.id === o.model_id) || {}).name || '—';
-        const vName = (state.variants.find(v => v.id === o.variant_id) || {}).variant_name || '—';
-        const stLabel = o.status === 'shipped' ? '<span style="color:#15803d;font-weight:700;">Отгружен</span>' : (o.status === 'cancelled' ? '<span style="color:#94a3b8;">Отменен</span>' : '<span style="color:#d97706;font-weight:700;">В резерве</span>');
-        const btns = o.status === 'reserved'
-          ? '<button class="btn btn-green" onclick="updateSaleStatus(' + o.id + ',\'shipped\')">Отгрузить</button> <button class="btn btn-red" style="padding:4px 8px;font-size:12px;" onclick="updateSaleStatus(' + o.id + ',\'cancelled\')">Отмена</button>'
-          : '—';
-        return '<tr><td><b>' + o.order_number + '</b></td><td>' + o.customer_name + '</td><td>' + mName + ' (' + vName + ')</td><td class="tc"><b>' + o.qty + '</b></td><td class="tc">' + stLabel + '</td><td class="tc">' + btns + '</td></tr>';
-      }).join('');
-    }
-
-    async function createSaleOrder() {
-      el('soErr').innerText = '';
-      const num = el('soNum').value.trim() || ('ЗК-' + Math.floor(100 + Math.random() * 900));
-      const cust = el('soCust').value.trim() || 'Покупатель';
-      const qty = Number(el('soQty').value);
-      try {
-        await sbFetch('sales_orders', {
-          method: 'POST',
-          body: JSON.stringify({
-            order_number: num, customer_name: cust,
-            model_id: Number(el('soModel').value), variant_id: Number(el('soVar').value),
-            qty: qty, status: 'reserved', created_by: state.user.name
-          })
-        });
-        el('soNum').value = ''; el('soCust').value = '';
-        loadFinishedGoods();
-      } catch (err) { el('soErr').innerText = err.message; }
-    }
-
-    async function updateSaleStatus(orderId, newStatus) {
-      try {
-        await sbFetch('sales_orders?id=eq.' + orderId, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
-        loadFinishedGoods();
-      } catch (err) { alert(err.message); }
-    }
-
-    function onBomModelChange() {
-      const mId = Number(el('bomModel').value);
-      const vs = state.variants.filter(v => v.model_id === mId);
-      el('bomVar').innerHTML = '<option value="">Все цвета модели (общая деталь)</option>' +
-        vs.map(v => '<option value="' + v.id + '">' + v.variant_name + '</option>').join('');
-    }
-
-    async function loadMaterialsData() {
-      const [mats, boms] = await Promise.all([
-        sbFetch('materials?is_active=eq.true&order=category,name'),
-        sbFetch('product_bom?order=id.desc')
-      ]);
-      state.materials = mats || [];
-      state.bom = boms || [];
-
-      const matOpts = state.materials.map(m => '<option value="' + m.id + '">' + m.name + ' (' + m.unit + ')</option>').join('');
-      el('inMatSel').innerHTML = matOpts;
-      el('bomMat').innerHTML = matOpts;
-
-      el('matStockBody').innerHTML = state.materials.map(m => {
-        const low = Number(m.stock_qty) <= Number(m.min_stock);
-        const st = low ? '<span style="color:#dc2626;font-weight:700;">⚠️ Мало</span>' : '<span style="color:#15803d;font-weight:700;">Норма</span>';
-        return '<tr style="' + (low ? 'background:#fef2f2;' : '') + '"><td>' + m.category + '</td><td><b>' + m.name + '</b></td><td class="tc"><b>' + m.stock_qty + ' ' + m.unit + '</b></td><td class="tc">' + m.min_stock + ' ' + m.unit + '</td><td class="tc">' + st + '</td></tr>';
-      }).join('') || '<tr><td colspan="5" class="tc" style="color:#64748b;">Добавьте первый материал сверху</td></tr>';
-
-      el('bomBody').innerHTML = state.bom.map(b => {
-        const mName = (state.models.find(m => m.id === b.model_id) || {}).name || '—';
-        const vName = b.variant_id ? ((state.variants.find(v => v.id === b.variant_id) || {}).variant_name || '') : 'Все варианты';
-        const mat = state.materials.find(x => x.id === b.material_id) || { name: '—', unit: '' };
-        return '<tr><td><b>' + mName + '</b><br><span style="font-size:11px;color:#64748b;">' + vName + '</span></td><td>' + mat.name + '</td><td class="tc"><b>' + b.qty_per_unit + ' ' + mat.unit + '</b></td><td class="tc"><button class="btn btn-red" style="padding:2px 6px;font-size:11px;" onclick="delBomItem(' + b.id + ')">✕</button></td></tr>';
-      }).join('');
-    }
-
-    async function addMaterial() {
-      const name = el('mName').value.trim();
-      if (!name) return;
-      await sbFetch('materials', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: name, category: el('mCat').value, unit: el('mUnit').value,
-          stock_qty: Number(el('mInitQty').value) || 0, min_stock: Number(el('mMinQty').value) || 0
-        })
-      });
-      el('mName').value = ''; el('mInitQty').value = ''; el('mMinQty').value = '';
-      loadMaterialsData();
-    }
-
-    async function receiveMaterial() {
-      const mId = Number(el('inMatSel').value);
-      const addQty = Number(el('inMatQty').value);
-      if (!mId || addQty <= 0) return;
-      const cur = state.materials.find(m => m.id === mId);
-      const nextQty = (Number(cur.stock_qty) || 0) + addQty;
-      await sbFetch('materials?id=eq.' + mId, { method: 'PATCH', body: JSON.stringify({ stock_qty: nextQty }) });
-      await sbFetch('material_movements', {
-        method: 'POST',
-        body: JSON.stringify({ material_id: mId, move_type: 'in', qty: addQty, reference_info: 'Приход на склад', created_by: state.user.name })
-      });
-      el('inMatQty').value = '';
-      loadMaterialsData();
-    }
-
-    async function addBomItem() {
-      const qty = Number(el('bomQty').value);
-      if (qty <= 0) return;
-      const vRaw = el('bomVar').value;
-      await sbFetch('product_bom', {
-        method: 'POST',
-        body: JSON.stringify({
-          model_id: Number(el('bomModel').value),
-          variant_id: vRaw ? Number(vRaw) : null,
-          material_id: Number(el('bomMat').value),
-          qty_per_unit: qty
-        })
-      });
-      el('bomQty').value = '';
-      loadMaterialsData();
-    }
-
-    async function delBomItem(id) {
-      await sbFetch('product_bom?id=eq.' + id, { method: 'DELETE' });
-      loadMaterialsData();
-    }
-    async function runRollover() {
-      try {
-        const moved = await sbFetch('rpc/rollover_unaccepted_tasks', { method: 'POST', body: JSON.stringify({ p_src_date: el('selDate').value }) });
-        alert('Перенесено невыполненных кресел на завтра: ' + (moved || 0) + ' шт.');
-        loadTasks();
-      } catch (err) { alert(err.message); }
-    }
-
-    async function addVariant() {
-      const name = el('newVarInp').value.trim();
-      if (!name) return;
-      await sbFetch('model_variants', { method: 'POST', body: JSON.stringify({ model_id: Number(el('catModelSel').value), variant_name: name }) });
-      state.variants = await sbFetch('model_variants?order=id') || [];
-      try { localStorage.removeItem('mes_catalog_v2'); } catch (e) {}
-      el('newVarInp').value = '';
-      onSoModelChange(); onBomModelChange();
-      alert('Вариант обивки добавлен!');
-    }
-
-    async function addWorker() {
-      const name = el('nwName').value.trim();
-      const pin = el('nwPin').value.trim();
-      if (!name || !/^\d{4}$/.test(pin)) { alert('Укажите имя и ровно 4 цифры PIN-кода.'); return; }
-      if (state.workers.some(w => String(w.pin_code) === pin)) { alert('Этот PIN-код уже занят другим сотрудником!'); return; }
-      const lim = Number(el('nwLimit').value);
-      await sbFetch('workers', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: name, pin_code: pin, workshop_id: Number(el('nwWorkshop').value),
-          default_shift_id: 1, role: el('nwRole').value, max_per_day: lim > 0 ? lim : null
-        })
-      });
-      state.workers = await sbFetch('workers?is_active=eq.true&order=id') || [];
-      try { localStorage.removeItem('mes_catalog_v2'); } catch (e) {}
-      el('nwName').value = ''; el('nwPin').value = ''; el('nwLimit').value = '';
-      renderCatalogWorkers();
-      alert('Сотрудник добавлен!');
-    }
-
-    async function changeWorkerPin(workerId) {
-      const w = state.workers.find(x => x.id === workerId);
-      if (!w) return;
-      const newPin = prompt('Введите новый 4-значный PIN-код для сотрудника «' + w.name + '»:', w.pin_code);
-      if (newPin === null) return;
-      const clean = String(newPin).trim();
-      if (!/^\d{4}$/.test(clean)) { alert('Ошибка: PIN-код должен состоять ровно из 4 цифр.'); return; }
-      if (state.workers.some(x => x.id !== workerId && String(x.pin_code) === clean)) {
-        alert('Этот PIN-код уже используется другим сотрудником!');
-        return;
-      }
-      try {
-        await sbFetch('workers?id=eq.' + workerId, { method: 'PATCH', body: JSON.stringify({ pin_code: clean }) });
-        w.pin_code = clean;
-        try { localStorage.removeItem('mes_catalog_v2'); } catch (e) {}
-        renderCatalogWorkers();
-        alert('Новый PIN-код для «' + w.name + '» успешно сохранен!');
-      } catch (err) { alert('Ошибка смены PIN: ' + err.message); }
-    }
-
-    function renderCatalogWorkers() {
-      el('catWorkersBody').innerHTML = state.workers.map(w => {
-        const wsName = (state.workshops.find(x => x.id === w.workshop_id) || {}).name || '—';
-        return '<tr><td><b>' + w.name + '</b></td><td>' + wsName + '</td><td><code>' + w.pin_code + '</code></td><td class="tc"><b>' + (w.max_per_day || '—') + '</b></td><td class="tc"><button class="btn btn-light" style="padding:3px 8px;font-size:11px;" onclick="changeWorkerPin(' + w.id + ')">🔑 Сменить PIN</button></td></tr>';
-      }).join('');
-    }
-
-    async function loadAnalytics() {
-      const mStr = el('repMonth').value;
-      const mTasks = await sbFetch('tasks?work_date=gte.' + mStr + '-01&work_date=lte.' + mStr + '-31&status=eq.active') || [];
-
-      el('repWorkersBody').innerHTML = state.workers.filter(w => w.role === 'worker').map(w => {
-        const wt = mTasks.filter(t => t.worker_id === w.id);
-        const p = wt.reduce((s, t) => s + t.plan_qty, 0);
-        const a = wt.reduce((s, t) => s + t.accepted_qty, 0);
-        return '<tr><td>' + w.name + '</td><td class="tc"><b>' + p + '</b></td><td class="tc" style="color:#15803d;"><b>' + a + '</b></td></tr>';
-      }).join('');
-
-      const abcMap = {}; let totAcc = 0;
-      mTasks.forEach(t => {
-        const k = t.model_id + '_' + t.variant_id;
-        if (!abcMap[k]) abcMap[k] = {
-          model: (state.models.find(m => m.id === t.model_id) || {}).name || '—',
-          mat: (state.variants.find(v => v.id === t.variant_id) || {}).variant_name || '—',
-          plan: 0, acc: 0
-        };
-        abcMap[k].plan += t.plan_qty; abcMap[k].acc += t.accepted_qty; totAcc += t.accepted_qty;
-      });
-      const sortedAbc = Object.values(abcMap).sort((a, b) => (b.acc - a.acc) || (b.plan - a.plan));
-      const basis = totAcc > 0 ? totAcc : sortedAbc.reduce((s, x) => s + x.plan, 0);
-      let cum = 0;
-      el('repAbcBody').innerHTML = sortedAbc.map(it => {
-        const v = totAcc > 0 ? it.acc : it.plan;
-        const share = basis > 0 ? v / basis : 0;
-        const prev = cum; cum += share;
-        const grp = v === 0 ? 'C' : (prev < 0.80 ? 'A' : (prev < 0.95 ? 'B' : 'C'));
-        const rowBg = grp === 'A' ? '#dcfce7' : (grp === 'B' ? '#fef9c3' : '#fff');
-        return '<tr style="background:' + rowBg + ';"><td><b>' + it.model + '</b></td><td>' + it.mat + '</td><td class="tc">' + it.plan + '</td><td class="tc" style="color:#15803d;"><b>' + it.acc + '</b></td><td class="tc">' + (share * 100).toFixed(1) + '%</td><td class="tc"><b>' + grp + '</b></td></tr>';
-      }).join('');
-
-      const today = new Date();
-      const d28 = new Date(today); d28.setDate(today.getDate() - 28);
-      const d6 = new Date(today); d6.setDate(today.getDate() + 6);
-      const fTasks = await sbFetch('tasks?work_date=gte.' + d28.toISOString().slice(0, 10) + '&work_date=lte.' + d6.toISOString().slice(0, 10) + '&status=eq.active') || [];
-      const fMap = {};
-      const todayIso = today.toISOString().slice(0, 10);
-      const d7Iso = new Date(today.getTime() - 7 * 86400000).toISOString().slice(0, 10);
-
-      fTasks.forEach(t => {
-        const k = t.model_id + '_' + t.variant_id;
-        if (!fMap[k]) fMap[k] = {
-          model: (state.models.find(m => m.id === t.model_id) || {}).name || '—',
-          mat: (state.variants.find(v => v.id === t.variant_id) || {}).variant_name || '—',
-          w1: 0, w24: 0, nextPlan: 0
-        };
-        if (t.work_date >= todayIso) fMap[k].nextPlan += t.plan_qty;
-        else if (t.work_date >= d7Iso) fMap[k].w1 += (t.accepted_qty || t.plan_qty);
-        else fMap[k].w24 += (t.accepted_qty || t.plan_qty);
-      });
-
-      el('fcBody').innerHTML = Object.values(fMap).map(it => {
-        const avg3 = it.w24 / 3;
-        const fc = Math.ceil(avg3 > 0 ? (0.5 * it.w1 + 0.5 * avg3) : it.w1);
-        const trend = avg3 === 0 && it.w1 > 0 ? '🆕 Новый' : (it.w1 > avg3 * 1.15 ? '↗ Рост' : (it.w1 < avg3 * 0.85 ? '↘ Спад' : '→ Стаб.'));
-        return { model: it.model, mat: it.mat, w1: it.w1, avg3: avg3.toFixed(1), trend: trend, fc: fc, next: it.nextPlan, toPlan: Math.max(0, fc - it.nextPlan) };
-      }).sort((a, b) => b.fc - a.fc).map(r =>
-        '<tr><td><b>' + r.model + '</b></td><td>' + r.mat + '</td><td class="tc">' + r.w1 + '</td><td class="tc">' + r.avg3 + '</td><td class="tc">' + r.trend + '</td><td class="tc" style="background:#dbeafe;font-weight:700;">' + r.fc + '</td><td class="tc">' + r.next + '</td><td class="tc" style="color:#b91c1c;font-weight:700;">' + r.toPlan + '</td></tr>'
-      ).join('');
-    }
-
-    window.addEventListener('DOMContentLoaded', bootstrap);
-  </script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
