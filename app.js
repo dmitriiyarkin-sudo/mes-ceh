@@ -6,7 +6,7 @@ let activeChannel = 'yandex';
 let state = {
   user: null, workshops: [], shifts: [], workers: [], models: [], variants: [], allowances: [], tasks: [],
   materials: [], bom: [], fgStock: [], salesOrders: [],
-  modalWorker: null, modalSlot: 1, editingTask: null, editingOrderId: null
+  modalWorker: null, modalSlot: 1, editingTask: null, editingOrderId: null, pollTimer: null
 };
 
 function buildUrl(path, channel) {
@@ -49,7 +49,7 @@ function roleName(r) { return r === 'admin' ? 'Офис / Рук.' : (r === 'otk
 function fmtDateRu(iso) {
   if (!iso) return '—';
   const p = String(iso).split('-');
-  return p.length === 3 ? (p[2] + '.' + p[1] + '.' + p[0]) : iso;
+  return p.length === 3 ? (p + '.' + p + '.' + p) : iso;
 }
 
 function applyCatalogData(data) {
@@ -70,17 +70,58 @@ function applyCatalogData(data) {
   return true;
 }
 
+function enterAppAs(found) {
+  state.user = found;
+  try { localStorage.setItem('mes_user_id', String(found.id)); } catch (e) {}
+  el('loginErr').innerText = ''; el('pinInp').value = '';
+  el('loginView').classList.add('hidden');
+  el('appView').classList.remove('hidden');
+  el('userBadge').innerHTML = '👤 <b>' + found.name + '</b> (' + roleName(found.role) + ')';
+
+  const isAdmin = found.role === 'admin';
+  const isWorker = found.role === 'worker';
+
+  el('nav-fg').classList.toggle('hidden', isWorker);
+  el('nav-mat').classList.toggle('hidden', isWorker);
+  el('nav-forecast').classList.toggle('hidden', isWorker);
+  el('nav-catalog').classList.toggle('hidden', !isAdmin);
+  el('btnRollover').classList.toggle('hidden', !isAdmin);
+
+  el('nav-schedule').innerText = isWorker ? '📋 Моё задание' : '📅 Цеха и смены';
+  el('nav-report').innerText = isWorker ? '📊 Моя статистика' : '📊 Отчет и ABC';
+
+  const wsBlock = el('selWorkshop').parentElement;
+  if (wsBlock) wsBlock.classList.toggle('hidden', isWorker);
+
+  if (found.workshop_id) el('selWorkshop').value = found.workshop_id;
+  if (!isWorker) renderCatalogWorkers();
+  switchTab('schedule');
+  loadTasks();
+
+  if (state.pollTimer) clearInterval(state.pollTimer);
+  state.pollTimer = setInterval(() => { if (!el('appView').classList.contains('hidden')) loadTasks(); }, 10000);
+}
+
 async function bootstrap() {
   el('selDate').value = new Date().toISOString().slice(0, 10);
   el('repMonth').value = new Date().toISOString().slice(0, 7);
   const loginBtn = el('btnLogin');
   el('loginErr').innerText = '';
+
+  let savedUserId = null;
+  try { savedUserId = localStorage.getItem('mes_user_id'); } catch (e) {}
+
   try {
     const cached = localStorage.getItem('mes_catalog_v2');
-    if (cached && applyCatalogData(JSON.parse(cached)) && loginBtn) {
-      loginBtn.disabled = false; loginBtn.innerHTML = 'Войти в систему';
+    if (cached && applyCatalogData(JSON.parse(cached))) {
+      if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = 'Войти в систему'; }
+      if (savedUserId) {
+        const u = state.workers.find(w => String(w.id) === String(savedUserId));
+        if (u) enterAppAs(u);
+      }
     } else if (loginBtn) {
-      loginBtn.disabled = true; loginBtn.innerHTML = '<span class="spinner"></span> Подключение к базе...';
+      loginBtn.disabled = true;
+      loginBtn.innerHTML = '<span class="spinner"></span> Подключение к базе...';
     }
   } catch (e) {}
 
@@ -94,12 +135,17 @@ async function bootstrap() {
       sbFetch('worker_allowed_models')
     ]);
     const fresh = {
-      workshops: res[0] || [], shifts: res[1] || [], workers: res[2] || [],
-      models: res[3] || [], variants: res[4] || [], allowances: res[5] || []
+      workshops: res || [], shifts: res || [], workers: res || [],
+      models: res || [], variants: res || [], allowances: res || []
     };
     if (applyCatalogData(fresh)) {
       try { localStorage.setItem('mes_catalog_v2', JSON.stringify(fresh)); } catch (e) {}
       if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = 'Войти в систему'; }
+      if (savedUserId) {
+        const u = state.workers.find(w => String(w.id) === String(savedUserId));
+        if (u) { if (!state.user) enterAppAs(u); }
+        else { doLogout(); }
+      }
     }
   } catch (err) {
     if (!state.workers.length) {
@@ -113,28 +159,21 @@ function doLogin() {
   if (!state.workers.length) { bootstrap(); return; }
   const pin = el('pinInp').value.trim();
   const found = state.workers.find(w => String(w.pin_code) === pin);
-  if (!found) { el('loginErr').innerText = 'Неверный PIN-код'; return; }
-  state.user = found;
-  el('loginErr').innerText = ''; el('pinInp').value = '';
-  el('loginView').classList.add('hidden');
-  el('appView').classList.remove('hidden');
-  el('userBadge').innerHTML = '👤 <b>' + found.name + '</b> (' + roleName(found.role) + ')';
-
-  const isAdmin = found.role === 'admin';
-  el('nav-catalog').classList.toggle('hidden', !isAdmin);
-  el('btnRollover').classList.toggle('hidden', !isAdmin);
-  if (found.workshop_id) el('selWorkshop').value = found.workshop_id;
-  renderCatalogWorkers();
-  loadTasks();
-  setInterval(() => { if (!el('appView').classList.contains('hidden')) loadTasks(); }, 10000);
+  if (!found) { el('loginErr').innerText = 'Неверный PIN-код или доступ закрыт'; return; }
+  enterAppAs(found);
 }
 
 function doLogout() {
   state.user = null;
+  if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+  try { localStorage.removeItem('mes_user_id'); } catch (e) {}
   el('appView').classList.add('hidden');
   el('loginView').classList.remove('hidden');
 }
 function switchTab(name) {
+  if (state.user && state.user.role === 'worker' && name !== 'schedule' && name !== 'report') {
+    name = 'schedule';
+  }
   ['schedule', 'fg', 'mat', 'report', 'forecast', 'catalog'].forEach(t => {
     el('tab-' + t).classList.toggle('hidden', t !== name);
     const nb = el('nav-' + t);
@@ -157,7 +196,11 @@ async function loadTasks() {
   const wId = el('selWorkshop').value;
   const sId = el('selShift').value;
   try {
-    state.tasks = await sbFetch('tasks?work_date=eq.' + d + '&workshop_id=eq.' + wId + '&shift_id=eq.' + sId + '&status=eq.active') || [];
+    let url = 'tasks?work_date=eq.' + d + '&workshop_id=eq.' + wId + '&shift_id=eq.' + sId + '&status=eq.active';
+    if (state.user && state.user.role === 'worker') {
+      url += '&worker_id=eq.' + state.user.id;
+    }
+    state.tasks = await sbFetch(url) || [];
     renderWorkersGrid();
   } catch (e) { console.error(e); }
 }
@@ -167,7 +210,7 @@ function renderWorkersGrid() {
   let list = state.workers.filter(w => w.role === 'worker' && w.workshop_id === wId);
   if (state.user.role === 'worker') list = list.filter(w => w.id === state.user.id);
   if (!list.length) {
-    el('workersGrid').innerHTML = '<div class="card" style="padding:20px;color:#64748b;">В этом подразделении пока нет назначенных мастеров. Добавьте их во вкладке «⚙️ Справочники».</div>';
+    el('workersGrid').innerHTML = '<div class="card" style="padding:20px;color:#64748b;">Нет назначенных мастеров или заданий на эту смену.</div>';
     return;
   }
 
@@ -680,6 +723,20 @@ async function addWorker() {
   alert('Сотрудник добавлен!');
 }
 
+async function dismissWorker(workerId) {
+  const w = state.workers.find(x => x.id === workerId);
+  if (!w) return;
+  if (state.user && w.id === state.user.id) { alert('Нельзя уволить самого себя!'); return; }
+  if (!confirm('Уволить сотрудника «' + w.name + '»? Он исчезнет из графиков смен и потеряет доступ по PIN, но его прошлые отчёты сохранятся.')) return;
+  try {
+    await sbFetch('workers?id=eq.' + workerId, { method: 'PATCH', body: JSON.stringify({ is_active: false }) });
+    state.workers = state.workers.filter(x => x.id !== workerId);
+    try { localStorage.removeItem('mes_catalog_v2'); } catch (e) {}
+    renderCatalogWorkers();
+    alert('Сотрудник «' + w.name + '» уволен и переведён в архив.');
+  } catch (err) { alert('Ошибка увольнения: ' + err.message); }
+}
+
 async function changeWorkerPin(workerId) {
   const w = state.workers.find(x => x.id === workerId);
   if (!w) return;
@@ -703,20 +760,32 @@ async function changeWorkerPin(workerId) {
 function renderCatalogWorkers() {
   el('catWorkersBody').innerHTML = state.workers.map(w => {
     const wsName = (state.workshops.find(x => x.id === w.workshop_id) || {}).name || '—';
-    return '<tr><td><b>' + w.name + '</b></td><td>' + wsName + '</td><td><code>' + w.pin_code + '</code></td><td class="tc"><b>' + (w.max_per_day || '—') + '</b></td><td class="tc"><button class="btn btn-light" style="padding:3px 8px;font-size:11px;" onclick="changeWorkerPin(' + w.id + ')">🔑 Сменить PIN</button></td></tr>';
+    const disBtn = (state.user && w.id === state.user.id) ? '' : ' <button class="btn btn-red" style="padding:3px 8px;font-size:11px;" onclick="dismissWorker(' + w.id + ')">🚫 Уволить</button>';
+    return '<tr><td><b>' + w.name + '</b></td><td>' + wsName + '</td><td><code>' + w.pin_code + '</code></td><td class="tc"><b>' + (w.max_per_day || '—') + '</b></td><td class="tc" style="white-space:nowrap;"><button class="btn btn-light" style="padding:3px 8px;font-size:11px;" onclick="changeWorkerPin(' + w.id + ')">🔑 PIN</button>' + disBtn + '</td></tr>';
   }).join('');
 }
 
 async function loadAnalytics() {
   const mStr = el('repMonth').value;
-  const mTasks = await sbFetch('tasks?work_date=gte.' + mStr + '-01&work_date=lte.' + mStr + '-31&status=eq.active') || [];
+  const isWorker = state.user && state.user.role === 'worker';
+  let url = 'tasks?work_date=gte.' + mStr + '-01&work_date=lte.' + mStr + '-31&status=eq.active';
+  if (isWorker) url += '&worker_id=eq.' + state.user.id;
+  const mTasks = await sbFetch(url) || [];
 
-  el('repWorkersBody').innerHTML = state.workers.filter(w => w.role === 'worker').map(w => {
+  const visibleWorkers = isWorker
+    ? state.workers.filter(w => w.id === state.user.id)
+    : state.workers.filter(w => w.role === 'worker');
+
+  el('repWorkersBody').innerHTML = visibleWorkers.map(w => {
     const wt = mTasks.filter(t => t.worker_id === w.id);
     const p = wt.reduce((s, t) => s + t.plan_qty, 0);
     const a = wt.reduce((s, t) => s + t.accepted_qty, 0);
-    return '<tr><td>' + w.name + '</td><td class="tc"><b>' + p + '</b></td><td class="tc" style="color:#15803d;"><b>' + a + '</b></td></tr>';
+    return '<tr><td><b>' + w.name + '</b></td><td class="tc"><b>' + p + '</b></td><td class="tc" style="color:#15803d;"><b>' + a + '</b></td></tr>';
   }).join('');
+
+  const abcCard = el('repAbcBody') ? el('repAbcBody').closest('.card') : null;
+  if (abcCard) abcCard.classList.toggle('hidden', isWorker);
+  if (isWorker) return;
 
   const abcMap = {}; let totAcc = 0;
   mTasks.forEach(t => {
