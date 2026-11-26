@@ -49,7 +49,7 @@ function roleName(r) { return r === 'admin' ? 'Офис / Рук.' : (r === 'otk
 function fmtDateRu(iso) {
   if (!iso) return '—';
   const p = String(iso).split('-');
-  return p.length === 3 ? (p + '.' + p + '.' + p) : iso;
+  return p.length === 3 ? (p[2] + '.' + p[1] + '.' + p[0]) : iso;
 }
 
 function applyCatalogData(data) {
@@ -134,9 +134,9 @@ async function bootstrap() {
       sbFetch('model_variants?order=id'),
       sbFetch('worker_allowed_models')
     ]);
-    const fresh = {
-      workshops: res || [], shifts: res || [], workers: res || [],
-      models: res || [], variants: res || [], allowances: res || []
+        const fresh = {
+      workshops: res[0] || [], shifts: res[1] || [], workers: res[2] || [],
+      models: res[3] || [], variants: res[4] || [], allowances: res[5] || []
     };
     if (applyCatalogData(fresh)) {
       try { localStorage.setItem('mes_catalog_v2', JSON.stringify(fresh)); } catch (e) {}
