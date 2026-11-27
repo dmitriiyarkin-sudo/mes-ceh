@@ -436,9 +436,9 @@ function getFilteredOrders() {
 function renderOrdersTable() {
   const list = getFilteredOrders();
   const stMap = {
-    reserved: '<span style="color:#d97706;font-weight:700;">В резерве</span>',
-    preorder: '<span style="color:#2563eb;font-weight:700;">В произв.</span>',
-    shipped: '<span style="color:#15803d;font-weight:700;">Отгружен</span>',
+    reserved: '<span style="color:#15803d;font-weight:700;">В резерве</span>',
+    preorder: '<span style="color:#dc2626;font-weight:700;">Нет на складе</span>',
+    shipped: '<span style="color:#475569;font-weight:700;">Отгружен</span>',
     cancelled: '<span style="color:#94a3b8;">Отменен</span>'
   };
 
@@ -449,19 +449,25 @@ function renderOrdersTable() {
     const total = (Number(o.unit_price || 0) * Number(o.qty || 1)) + Number(o.delivery_cost || 0);
     const paid = Number(o.pay_cash || 0) + Number(o.pay_card || 0) + Number(o.pay_bank || 0);
 
+    const isNoStock = o.status === 'preorder';
+    const rowStyle = isNoStock ? 'background:#fef2f2;' : '';
+    const stockWarn = isNoStock
+      ? '<div style="font-size:11px;color:#dc2626;font-weight:700;margin-top:2px;">⚠️ Нет на складе (в производство)</div>'
+      : '';
+
     let btns = '<button class="btn btn-light" style="padding:3px 7px;font-size:11px;" onclick="openOrderModal(' + o.id + ')">📄 Карточка</button> ';
-    if (o.status === 'preorder') {
+    if (isNoStock) {
       btns += '<button class="btn btn-amber" style="padding:3px 7px;font-size:11px;" onclick="updateSaleStatus(' + o.id + ',\'reserved\')">В резерв</button> ';
     }
-    if (o.status === 'reserved' || o.status === 'preorder') {
+    if (o.status === 'reserved' || isNoStock) {
       btns += '<button class="btn btn-green" style="padding:3px 7px;font-size:11px;" onclick="updateSaleStatus(' + o.id + ',\'shipped\')">Отгрузить</button> ';
       btns += '<button class="btn btn-red" style="padding:3px 7px;font-size:11px;" onclick="updateSaleStatus(' + o.id + ',\'cancelled\')">✕</button>';
     }
 
-    return '<tr>' +
+    return '<tr style="' + rowStyle + '">' +
       '<td><b>' + o.order_number + '</b><div style="font-size:11px;color:#64748b;">' + fmtDateRu(o.order_date) + '</div></td>' +
       '<td><b>' + o.customer_name + '</b><div style="font-size:11px;color:#475569;">' + (o.customer_phone || '—') + '</div></td>' +
-      '<td><b>' + mName + '</b> (' + vName + ')<div style="font-size:11px;color:#64748b;">' + (o.configuration || 'Стандарт') + '</div></td>' +
+      '<td><b>' + mName + '</b> (' + vName + ')<div style="font-size:11px;color:#64748b;">' + (o.configuration || 'Стандарт') + '</div>' + stockWarn + '</td>' +
       '<td class="tc"><b>' + o.qty + '</b></td>' +
       '<td>' + (addr || 'Самовывоз') + '<div style="font-size:11px;color:#2563eb;">' + (o.delivery_time || '') + '</div></td>' +
       '<td class="tr"><b>' + total + ' ₽</b><div style="font-size:11px;color:#15803d;">Опл: ' + paid + ' ₽</div></td>' +
