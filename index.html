@@ -58,6 +58,7 @@
           <div style="display:flex;gap:5px;flex-wrap:wrap;">
             <button class="btn btn-primary" id="nav-schedule" onclick="switchTab('schedule')">📅 Цеха и смены</button>
             <button class="btn btn-dark" id="nav-fg" onclick="switchTab('fg')">🚚 Заказы, доставка и склад ГП</button>
+            <button class="btn btn-dark" id="nav-logistics" onclick="switchTab('logistics')">🗺️ Логистика и рейсы</button>
             <button class="btn btn-dark" id="nav-mat" onclick="switchTab('mat')">📦 Материалы и техкарты</button>
             <button class="btn btn-dark" id="nav-report" onclick="switchTab('report')">📊 Отчет и ABC</button>
             <button class="btn btn-dark" id="nav-forecast" onclick="switchTab('forecast')">📈 Прогноз 7 дн.</button>
@@ -98,6 +99,28 @@
           </div>
         </div>
         <div id="workersGrid" class="grid-cards"></div>
+      </div>
+            <!-- Вкладка: Отдел логистики и маршруты водителей -->
+      <div id="tab-logistics" class="hidden">
+        <div class="card no-print" style="padding:14px;margin-bottom:16px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
+            <b>Дата доставки:</b>
+            <div style="display:flex;gap:4px;">
+              <button class="btn btn-light" onclick="shiftLogDate(-1)">◀</button>
+              <input type="date" id="logDate" onchange="loadLogistics()" style="font-weight:700;">
+              <button class="btn btn-light" onclick="shiftLogDate(1)">▶</button>
+            </div>
+          </div>
+          <div style="font-size:12px;color:#64748b;">
+            ⚠️ Бронирование адреса водителем необратимо (снять может только руководитель)
+          </div>
+        </div>
+
+        <h3 style="margin:0 0 10px;">📋 Мои забронированные заказы на рейс</h3>
+        <div id="myDeliveriesGrid" class="grid-cards" style="margin-bottom:22px;"></div>
+
+        <h3 style="margin:0 0 10px;">🆓 Свободные заказы на доставку (доступны для брони)</h3>
+        <div id="freeDeliveriesGrid" class="grid-cards"></div>
       </div>
       <div id="tab-fg" class="hidden">
         <div class="card no-print" style="padding:14px;margin-bottom:16px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;">
@@ -246,7 +269,7 @@
               </div>
               <div style="display:flex;gap:8px;">
                 <select id="nwWorkshop" style="flex:2;"></select>
-                <select id="nwRole" style="flex:1;"><option value="worker">Мастер цеха</option><option value="otk">ОТК</option><option value="admin">Офис / Рук.</option></select>
+                 <select id="nwRole" style="flex:1;"><option value="worker">Мастер цеха</option><option value="driver">Водитель / Курьер</option><option value="otk">ОТК</option><option value="admin">Офис / Рук.</option></select>
                 <input type="number" id="nwLimit" placeholder="Норма/день" style="width:110px;">
               </div>
               <button class="btn btn-primary" onclick="addWorker()">+ Добавить сотрудника</button>
@@ -298,13 +321,14 @@
         <label>№ Заказа<br><input type="text" id="oNum" placeholder="№" style="width:100%;"></label>
         <label>Дата заказа<br><input type="date" id="oDate" style="width:100%;"></label>
         <label>Менеджер<br><input type="text" id="oMgr" placeholder="ФИО менеджера" style="width:100%;"></label>
-        <label>Водитель<br><input type="text" id="oDrv" placeholder="ФИО водителя" style="width:100%;"></label>
+        <label>Водитель (курьер)<br><select id="oDrvSel" style="width:100%;"></select></label>
         <label>Источник обращения<br><input type="text" id="oSrc" list="srcList" placeholder="Авито, Сайт, Ozon..." style="width:100%;"></label>
         <datalist id="srcList"><option value="Авито"><option value="Сайт"><option value="Ozon"><option value="Wildberries"><option value="Звонок / Рекомендация"></datalist>
       </div>
 
       <div class="sec-title">2. Клиент и состав заказа</div>
       <div class="form-grid">
+        <label>Дата доставки<br><input type="date" id="oDelivDate" style="width:100%;font-weight:700;"></label>
         <label>Клиент<br><input type="text" id="oCust" placeholder="Имя покупателя" style="width:100%;"></label>
         <label>Номер телефона<br><input type="text" id="oPhone" placeholder="+7 (___) ___-__-__" style="width:100%;"></label>
         <label>Название кресла<br><select id="oModel" onchange="onOrderModelChange()" style="width:100%;"></select></label>
@@ -350,6 +374,6 @@
     </div>
   </div>
 
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=7"></script>
 </body>
 </html>
