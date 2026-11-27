@@ -45,11 +45,25 @@ async function sbFetch(path, options) {
 }
 
 function el(id) { return document.getElementById(id); }
-function roleName(r) { return r === 'admin' ? 'Офис / Рук.' : (r === 'otk' ? 'ОТК / Ст. мастер' : 'Мастер цеха'); }
+function roleName(r) {
+  if (r === 'admin') return 'Офис / Рук.';
+  if (r === 'otk') return 'ОТК / Ст. мастер';
+  if (r === 'driver') return 'Водитель / Курьер';
+  return 'Мастер цеха';
+}
+
 function fmtDateRu(iso) {
   if (!iso) return '—';
   const p = String(iso).split('-');
   return p.length === 3 ? (p[2] + '.' + p[1] + '.' + p[0]) : iso;
+}
+
+function populateDriversSelect() {
+  const sel = el('oDrvSel');
+  if (!sel) return;
+  const drivers = state.workers.filter(w => w.role === 'driver');
+  sel.innerHTML = '<option value="">— Не назначен (свободен для брони) —</option>' +
+    drivers.map(d => '<option value="' + d.id + '">' + d.name + '</option>').join('');
 }
 
 function applyCatalogData(data) {
@@ -66,6 +80,7 @@ function applyCatalogData(data) {
   el('catModelSel').innerHTML = mOpts;
   el('oModel').innerHTML = mOpts;
   el('bomModel').innerHTML = mOpts;
+  populateDriversSelect();
   onOrderModelChange(); onBomModelChange();
   return true;
 }
@@ -83,11 +98,20 @@ function enterAppAs(found) {
   el('userBadge').innerHTML = '👤 <b>' + found.name + '</b> (' + roleName(found.role) + ')';
 
   const isAdmin = found.role === 'admin';
-  const isWorker = !isStaffManager(found);
+  const isDriver = found.role === 'driver';
+  const isWorker = found.role === 'worker';
 
-  ['nav-fg', 'nav-mat', 'nav-forecast'].forEach(id => {
-    if (el(id)) el(id).style.display = isWorker ? 'none' : '';
-  });
+  if (el('logDate') && !el('logDate').value) {
+    el('logDate').value = new Date().toISOString().slice(0, 10);
+  }
+
+  // Настраиваем видимость вкладок строго по роли
+  if (el('nav-schedule')) el('nav-schedule').style.display = isDriver ? 'none' : '';
+  if (el('nav-logistics')) el('nav-logistics').style.display = (isDriver || isStaffManager(found)) ? '' : 'none';
+  if (el('nav-fg')) el('nav-fg').style.display = isStaffManager(found) ? '' : 'none';
+  if (el('nav-mat')) el('nav-mat').style.display = isStaffManager(found) ? '' : 'none';
+  if (el('nav-report')) el('nav-report').style.display = (isWorker || isStaffManager(found)) ? '' : 'none';
+  if (el('nav-forecast')) el('nav-forecast').style.display = isStaffManager(found) ? '' : 'none';
   if (el('nav-catalog')) el('nav-catalog').style.display = isAdmin ? '' : 'none';
   if (el('btnRollover')) el('btnRollover').style.display = isAdmin ? '' : 'none';
 
@@ -98,12 +122,21 @@ function enterAppAs(found) {
   if (wsBlock) wsBlock.style.display = isWorker ? 'none' : '';
 
   if (found.workshop_id) el('selWorkshop').value = found.workshop_id;
-  if (!isWorker) renderCatalogWorkers();
-  switchTab('schedule');
-  loadTasks();
+  if (isStaffManager(found)) renderCatalogWorkers();
+
+  if (isDriver) {
+    switchTab('logistics');
+  } else {
+    switchTab('schedule');
+    loadTasks();
+  }
 
   if (state.pollTimer) clearInterval(state.pollTimer);
-  state.pollTimer = setInterval(() => { if (!el('appView').classList.contains('hidden')) loadTasks(); }, 10000);
+  state.pollTimer = setInterval(() => {
+    if (el('appView').classList.contains('hidden')) return;
+    if (isDriver || !el('tab-logistics').classList.contains('hidden')) loadLogistics();
+    else loadTasks();
+  }, 10000);
 }
 
 async function bootstrap() {
@@ -175,14 +208,17 @@ function doLogout() {
   el('loginView').classList.remove('hidden');
 }
 function switchTab(name) {
-  if (state.user && state.user.role === 'worker' && name !== 'schedule' && name !== 'report') {
+  if (state.user && state.user.role === 'driver') {
+    name = 'logistics';
+  } else if (state.user && state.user.role === 'worker' && name !== 'schedule' && name !== 'report') {
     name = 'schedule';
   }
-  ['schedule', 'fg', 'mat', 'report', 'forecast', 'catalog'].forEach(t => {
-    el('tab-' + t).classList.toggle('hidden', t !== name);
+  ['schedule', 'logistics', 'fg', 'mat', 'report', 'forecast', 'catalog'].forEach(t => {
+    if (el('tab-' + t)) el('tab-' + t).classList.toggle('hidden', t !== name);
     const nb = el('nav-' + t);
     if (nb) { nb.className = (t === name) ? 'btn btn-primary' : 'btn btn-dark'; }
   });
+  if (name === 'logistics') loadLogistics();
   if (name === 'fg') loadFinishedGoods();
   if (name === 'mat') loadMaterialsData();
   if (name === 'report' || name === 'forecast') loadAnalytics();
@@ -486,7 +522,9 @@ function openOrderModal(orderId) {
   el('oNum').value = o ? o.order_number : ('ЗК-' + Math.floor(100 + Math.random() * 900));
   el('oDate').value = o && o.order_date ? o.order_date : new Date().toISOString().slice(0, 10);
   el('oMgr').value = o ? (o.manager_name || '') : (state.user ? state.user.name : '');
-  el('oDrv').value = o ? (o.driver_name || '') : '';
+    populateDriversSelect();
+  el('oDrvSel').value = o && o.driver_id ? String(o.driver_id) : '';
+  el('oDelivDate').value = o && o.delivery_date ? o.delivery_date : (o && o.order_date ? o.order_date : new Date().toISOString().slice(0, 10));
   el('oSrc').value = o ? (o.lead_source || '') : '';
   el('oCust').value = o ? (o.customer_name || '') : '';
   el('oPhone').value = o ? (o.customer_phone || '') : '';
@@ -549,7 +587,9 @@ async function saveOrderModal() {
     order_number: el('oNum').value.trim() || ('ЗК-' + Math.floor(100 + Math.random() * 900)),
     order_date: el('oDate').value || new Date().toISOString().slice(0, 10),
     manager_name: el('oMgr').value.trim(),
-    driver_name: el('oDrv').value.trim(),
+    delivery_date: el('oDelivDate').value || el('oDate').value || new Date().toISOString().slice(0, 10),
+    driver_id: el('oDrvSel').value ? Number(el('oDrvSel').value) : null,
+    driver_name: el('oDrvSel').value ? ((state.workers.find(w => String(w.id) === el('oDrvSel').value) || {}).name || '') : '',
     lead_source: el('oSrc').value.trim(),
     customer_name: el('oCust').value.trim() || 'Покупатель',
     customer_phone: el('oPhone').value.trim(),
@@ -749,6 +789,7 @@ async function addWorker() {
   try { localStorage.removeItem('mes_catalog_v2'); } catch (e) {}
   el('nwName').value = ''; el('nwPin').value = ''; el('nwLimit').value = '';
   renderCatalogWorkers();
+  populateDriversSelect();
   alert('Сотрудник добавлен!');
 }
 
@@ -869,6 +910,144 @@ async function loadAnalytics() {
   }).sort((a, b) => b.fc - a.fc).map(r =>
     '<tr><td><b>' + r.model + '</b></td><td>' + r.mat + '</td><td class="tc">' + r.w1 + '</td><td class="tc">' + r.avg3 + '</td><td class="tc">' + r.trend + '</td><td class="tc" style="background:#dbeafe;font-weight:700;">' + r.fc + '</td><td class="tc">' + r.next + '</td><td class="tc" style="color:#b91c1c;font-weight:700;">' + r.toPlan + '</td></tr>'
   ).join('');
+}
+
+function shiftLogDate(days) {
+  const d = new Date(el('logDate').value || new Date().toISOString().slice(0, 10));
+  d.setDate(d.getDate() + days);
+  el('logDate').value = d.toISOString().slice(0, 10);
+  loadLogistics();
+}
+
+async function loadLogistics() {
+  const d = el('logDate').value || new Date().toISOString().slice(0, 10);
+  el('logDate').value = d;
+  try {
+    const [orders, fg] = await Promise.all([
+      sbFetch('sales_orders?delivery_date=eq.' + d + '&status=neq.cancelled&order=delivery_time,id'),
+      sbFetch('finished_goods_stock')
+    ]);
+    state.fgStock = fg || [];
+    renderLogisticsGrids(orders || []);
+  } catch (err) { console.error(err); }
+}
+
+function renderLogisticsGrids(orders) {
+  const isDriver = state.user && state.user.role === 'driver';
+  const myOrders = isDriver
+    ? orders.filter(o => Number(o.driver_id) === Number(state.user.id))
+    : orders.filter(o => o.driver_id || (o.driver_name && o.driver_name.trim() !== ''));
+
+  const freeOrders = orders.filter(o => !o.driver_id && (!o.driver_name || o.driver_name.trim() === '') && o.status !== 'shipped');
+
+  const renderCard = (o, mode) => {
+    const mName = (state.models.find(m => m.id === o.model_id) || {}).name || '—';
+    const vName = (state.variants.find(v => v.id === o.variant_id) || {}).variant_name || '—';
+    const fullAddr = [
+      o.city, o.street,
+      o.house ? 'д. ' + o.house : '',
+      o.building ? 'корп. ' + o.building : '',
+      o.entrance ? 'подъезд ' + o.entrance : '',
+      o.floor ? 'этаж ' + o.floor : '',
+      o.apartment ? 'кв. ' + o.apartment : ''
+    ].filter(Boolean).join(', ') || 'Адрес не указан';
+
+    const total = (Number(o.unit_price || 0) * Number(o.qty || 1)) + Number(o.delivery_cost || 0);
+    const paid = Number(o.pay_cash || 0) + Number(o.pay_card || 0) + Number(o.pay_bank || 0);
+    const toCollect = Math.max(0, total - paid);
+
+    const stockBadge = o.status === 'shipped'
+      ? '<span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">✅ Доставлен</span>'
+      : (o.status === 'reserved'
+        ? '<span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">📦 Готово на складе</span>'
+        : '<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">⏳ Ещё в цеху</span>');
+
+    let actionHtml = '';
+    if (mode === 'free') {
+      actionHtml = '<button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="claimDelivery(' + o.id + ')">🙋 Забронировать за собой</button>';
+    } else if (o.status !== 'shipped') {
+      actionHtml = '<div style="display:flex;gap:8px;margin-top:10px;">' +
+        '<button class="btn btn-green" style="flex:1;padding:8px;" onclick="completeDelivery(' + o.id + ',' + toCollect + ')">✅ Доставлено / Внести оплату</button>' +
+        '</div>';
+    }
+
+    const drvLine = !isDriver && o.driver_name
+      ? '<div style="font-size:12px;color:#1e40af;margin-bottom:6px;">🚚 Водитель: <b>' + o.driver_name + '</b></div>'
+      : '';
+
+    return '<div class="card" style="padding:14px;border-left:4px solid ' + (mode === 'free' ? '#f59e0b' : (o.status === 'shipped' ? '#16a34a' : '#2563eb')) + ';">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+        '<b>Заказ № ' + o.order_number + (o.delivery_time ? ' • 🕒 ' + o.delivery_time : '') + '</b>' + stockBadge +
+      '</div>' +
+      drvLine +
+      '<div style="font-size:14px;font-weight:700;margin-bottom:4px;">📍 ' + fullAddr + '</div>' +
+      '<div style="font-size:13px;margin-bottom:4px;">👤 ' + o.customer_name + (o.customer_phone ? ' • <a href="tel:' + o.customer_phone + '" style="color:#2563eb;font-weight:700;">📞 ' + o.customer_phone + '</a>' : '') + '</div>' +
+      '<div style="font-size:12px;color:#334155;background:#f8fafc;padding:6px 8px;border-radius:6px;margin-bottom:6px;">🪑 <b>' + mName + '</b> (' + vName + ') • ' + (o.configuration || 'Стандарт') + ' — <b>' + o.qty + ' шт.</b></div>' +
+      (o.comment ? '<div style="font-size:12px;color:#b45309;margin-bottom:6px;">💬 ' + o.comment + '</div>' : '') +
+      '<div style="font-size:13px;border-top:1px solid #e2e8f0;padding-top:6px;display:flex;justify-content:space-between;">' +
+        '<span>Сумма: <b>' + total + ' ₽</b></span>' +
+        '<span>К получению: <b style="color:' + (toCollect > 0 ? '#dc2626' : '#15803d') + ';">' + toCollect + ' ₽</b></span>' +
+      '</div>' +
+      actionHtml +
+    '</div>';
+  };
+
+  el('myDeliveriesGrid').innerHTML = myOrders.map(o => renderCard(o, 'my')).join('') ||
+    '<div class="card" style="padding:16px;color:#64748b;">На выбранную дату забронированных заказов нет.</div>';
+
+  el('freeDeliveriesGrid').innerHTML = freeOrders.map(o => renderCard(o, 'free')).join('') ||
+    '<div class="card" style="padding:16px;color:#64748b;">Свободных заказов на эту дату нет.</div>';
+}
+
+async function claimDelivery(orderId) {
+  const confirmed = confirm(
+    '⚠️ ВНИМАНИЕ!\n\n' +
+    'После нажатия «ОК» этот адрес доставки будет жёстко закреплён за вами.\n' +
+    'Самостоятельно отказаться от доставки данного заказа вы уже не сможете (снять бронь может только руководитель).\n\n' +
+    'Забронировать этот адрес за собой?'
+  );
+  if (!confirmed) return;
+
+  try {
+    await sbFetch('rpc/claim_delivery_order', {
+      method: 'POST',
+      body: JSON.stringify({
+        p_order_id: orderId,
+        p_driver_id: state.user.id,
+        p_driver_name: state.user.name
+      })
+    });
+    alert('✅ Адрес успешно закреплён за вами!');
+    loadLogistics();
+  } catch (err) {
+    alert('⚠️ ' + err.message);
+    loadLogistics();
+  }
+}
+
+async function completeDelivery(orderId, defaultCash) {
+  const cashStr = prompt('Подтверждение доставки.\nСколько получено НАЛИЧНЫМИ от клиента (₽)?', String(defaultCash));
+  if (cashStr === null) return;
+  const cardStr = prompt('Сколько получено КАРТОЙ / переводом от клиента (₽)?', '0');
+  if (cardStr === null) return;
+  const expStr = prompt('Расходы водителя наличными по этому рейсу (бензин, парковка, ₽):', '0');
+  if (expStr === null) return;
+
+  try {
+    await sbFetch('sales_orders?id=eq.' + orderId, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: 'shipped',
+        pay_cash: Number(cashStr) || 0,
+        pay_card: Number(cardStr) || 0,
+        cash_expenses: Number(expStr) || 0
+      })
+    });
+    alert('✅ Доставка закрыта, оплата сохранена!');
+    loadLogistics();
+  } catch (err) {
+    alert('⚠️ Ошибка при закрытии доставки: ' + err.message);
+  }
 }
 
 window.addEventListener('DOMContentLoaded', bootstrap);
