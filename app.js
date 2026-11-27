@@ -70,6 +70,10 @@ function applyCatalogData(data) {
   return true;
 }
 
+function isStaffManager(user) {
+  return user && (user.role === 'admin' || user.role === 'otk');
+}
+
 function enterAppAs(found) {
   state.user = found;
   try { localStorage.setItem('mes_user_id', String(found.id)); } catch (e) {}
@@ -79,19 +83,19 @@ function enterAppAs(found) {
   el('userBadge').innerHTML = '👤 <b>' + found.name + '</b> (' + roleName(found.role) + ')';
 
   const isAdmin = found.role === 'admin';
-  const isWorker = found.role === 'worker';
+  const isWorker = !isStaffManager(found);
 
-  el('nav-fg').classList.toggle('hidden', isWorker);
-  el('nav-mat').classList.toggle('hidden', isWorker);
-  el('nav-forecast').classList.toggle('hidden', isWorker);
-  el('nav-catalog').classList.toggle('hidden', !isAdmin);
-  el('btnRollover').classList.toggle('hidden', !isAdmin);
+  ['nav-fg', 'nav-mat', 'nav-forecast'].forEach(id => {
+    if (el(id)) el(id).style.display = isWorker ? 'none' : '';
+  });
+  if (el('nav-catalog')) el('nav-catalog').style.display = isAdmin ? '' : 'none';
+  if (el('btnRollover')) el('btnRollover').style.display = isAdmin ? '' : 'none';
 
   el('nav-schedule').innerText = isWorker ? '📋 Моё задание' : '📅 Цеха и смены';
   el('nav-report').innerText = isWorker ? '📊 Моя статистика' : '📊 Отчет и ABC';
 
   const wsBlock = el('selWorkshop').parentElement;
-  if (wsBlock) wsBlock.classList.toggle('hidden', isWorker);
+  if (wsBlock) wsBlock.style.display = isWorker ? 'none' : '';
 
   if (found.workshop_id) el('selWorkshop').value = found.workshop_id;
   if (!isWorker) renderCatalogWorkers();
@@ -579,10 +583,29 @@ async function saveOrderModal() {
 }
 
 async function updateSaleStatus(orderId, newStatus) {
+  const order = state.salesOrders.find(x => x.id === orderId);
+  if (order && (newStatus === 'shipped' || newStatus === 'reserved')) {
+    const stockItem = state.fgStock.find(s => s.model_id === order.model_id && s.variant_id === order.variant_id);
+    const phys = stockItem ? Number(stockItem.physical_qty || 0) : 0;
+    const resv = stockItem ? Number(stockItem.reserved_qty || 0) : 0;
+    const free = Math.max(0, phys - resv);
+
+    if (order.status === 'preorder' && free < Number(order.qty)) {
+      alert('⚠️ Кресла нет на складе готовой продукции (свободно: ' + free + ' шт., нужно: ' + order.qty + ' шт.)!\n\nЕго необходимо сначала изготовить в цеху и принять через ОТК.');
+      return;
+    }
+    if (order.status === 'reserved' && newStatus === 'shipped' && phys < Number(order.qty)) {
+      alert('⚠️ На складе готовой продукции недостаточно кресел для отгрузки! Сначала изготовьте и примите через ОТК.');
+      return;
+    }
+  }
+
   try {
     await sbFetch('sales_orders?id=eq.' + orderId, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
     loadFinishedGoods();
-  } catch (err) { alert(err.message); }
+  } catch (err) {
+    alert('⚠️ ' + err.message);
+  }
 }
 
 function exportOrdersCsv() {
@@ -767,14 +790,17 @@ function renderCatalogWorkers() {
 
 async function loadAnalytics() {
   const mStr = el('repMonth').value;
-  const isWorker = state.user && state.user.role === 'worker';
-  let url = 'tasks?work_date=gte.' + mStr + '-01&work_date=lte.' + mStr + '-31&status=eq.active';
+  const parts = mStr.split('-');
+  const yr = Number(parts);
+  const mo = Number(parts);
+  const lastDay = new Date(yr, mo, 0).getDate();
+  const dateFrom = mStr + '-01';
+  const dateTo = mStr + '-' + String(lastDay).padStart(2, '0');
+
+  const isWorker = !isStaffManager(state.user);
+  let url = 'tasks?work_date=gte.' + dateFrom + '&work_date=lte.' + dateTo + '&status=eq.active';
   if (isWorker) url += '&worker_id=eq.' + state.user.id;
   const mTasks = await sbFetch(url) || [];
-
-  const visibleWorkers = isWorker
-    ? state.workers.filter(w => w.id === state.user.id)
-    : state.workers.filter(w => w.role === 'worker');
 
   el('repWorkersBody').innerHTML = visibleWorkers.map(w => {
     const wt = mTasks.filter(t => t.worker_id === w.id);
