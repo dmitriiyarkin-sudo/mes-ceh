@@ -525,6 +525,9 @@ function openOrderModal(orderId) {
     populateDriversSelect();
   el('oDrvSel').value = o && o.driver_id ? String(o.driver_id) : '';
   el('oDelivDate').value = o && o.delivery_date ? o.delivery_date : (o && o.order_date ? o.order_date : new Date().toISOString().slice(0, 10));
+    if (el('oAddrSuggest')) el('oAddrSuggest').value = '';
+  if (el('addrSuggestDropdown')) el('addrSuggestDropdown').classList.add('hidden');
+  initYandexSuggestOnce();
   el('oSrc').value = o ? (o.lead_source || '') : '';
   el('oCust').value = o ? (o.customer_name || '') : '';
   el('oPhone').value = o ? (o.customer_phone || '') : '';
@@ -929,6 +932,7 @@ async function loadLogistics() {
     ]);
     state.fgStock = fg || [];
     renderLogisticsGrids(orders || []);
+    updateLogisticsMap(orders || []);
   } catch (err) { console.error(err); }
 }
 
@@ -962,13 +966,17 @@ function renderLogisticsGrids(orders) {
         ? '<span style="background:#dbeafe;color:#1d4ed8;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">📦 Готово на складе</span>'
         : '<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;">⏳ Ещё в цеху</span>');
 
-    let actionHtml = '';
+        const navQuery = encodeURIComponent([o.city || 'Москва', o.street, o.house].filter(Boolean).join(', '));
+    let actionHtml = '<div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">' +
+      '<button class="btn btn-light" style="padding:6px 10px;font-size:12px;" onclick="focusOrderOnMap(' + o.id + ')">📍 На карте</button>' +
+      '<a href="https://yandex.ru' + navQuery + '" target="_blank" class="btn btn-light" style="padding:6px 10px;font-size:12px;text-decoration:none;">🧭 Навигатор</a>';
+
     if (mode === 'free') {
-      actionHtml = '<button class="btn btn-primary" style="width:100%;margin-top:10px;" onclick="claimDelivery(' + o.id + ')">🙋 Забронировать за собой</button>';
+      actionHtml += '<button class="btn btn-primary" style="flex:1;" onclick="claimDelivery(' + o.id + ')">🙋 Забронировать за собой</button>';
     } else if (o.status !== 'shipped') {
-      actionHtml = '<div style="display:flex;gap:8px;margin-top:10px;">' +
-        '<button class="btn btn-green" style="flex:1;padding:8px;" onclick="completeDelivery(' + o.id + ',' + toCollect + ')">✅ Доставлено / Внести оплату</button>' +
-        '</div>';
+      actionHtml += '<button class="btn btn-green" style="flex:1;padding:7px;" onclick="completeDelivery(' + o.id + ',' + toCollect + ')">✅ Доставлено</button>';
+    }
+    actionHtml += '</div>';
     }
 
     const drvLine = !isDriver && o.driver_name
@@ -1048,6 +1056,228 @@ async function completeDelivery(orderId, defaultCash) {
   } catch (err) {
     alert('⚠️ Ошибка при закрытии доставки: ' + err.message);
   }
+}
+let logMap = null;
+let logPlacemarks = {};
+let geoCache = {};
+let yandexSuggestInited = false;
+let suggestDebounce = null;
+try { geoCache = JSON.parse(localStorage.getItem('mes_geo_cache_v1') || '{}'); } catch (e) {}
+
+function ensureLogisticsMap() {
+  return new Promise(resolve => {
+    if (logMap) {
+      logMap.container.fitToViewport();
+      resolve(logMap);
+      return;
+    }
+    if (typeof ymaps === 'undefined') {
+      el('logisticsMap').innerHTML = '<div style="padding:20px;color:#64748b;">Не удалось загрузить скрипт Яндекс.Карт. Проверьте интернет-соединение.</div>';
+      resolve(null);
+      return;
+    }
+    ymaps.ready(() => {
+      logMap = new ymaps.Map('logisticsMap', {
+        center: [55.7558, 37.6173],
+        zoom: 10,
+        controls: ['zoomControl', 'fullscreenControl', 'geolocationControl']
+      });
+      resolve(logMap);
+    });
+  });
+}
+
+async function geocodeMoscowOrder(o) {
+  const city = (o.city && o.city.trim()) ? o.city.trim() : 'Москва';
+  const rawAddr = [city, o.street, o.house ? 'д. ' + o.house : ''].filter(Boolean).join(', ');
+  if (!o.street && !o.house) return null;
+  if (geoCache[rawAddr]) return geoCache[rawAddr];
+
+  try {
+    if (typeof ymaps !== 'undefined') {
+      const res = await ymaps.geocode(rawAddr, { results: 1, boundedBy: [[55.1, 36.8], [56.2, 38.5]] });
+      const first = res.geoObjects.get(0);
+      if (first) {
+        const coords = first.geometry.getCoordinates();
+        geoCache[rawAddr] = coords;
+        try { localStorage.setItem('mes_geo_cache_v1', JSON.stringify(geoCache)); } catch (e) {}
+        return coords;
+      }
+    }
+  } catch (e) {}
+
+  try {
+    const url = 'https://openstreetmap.org' + encodeURIComponent(rawAddr);
+    const resp = await fetch(url);
+    const arr = await resp.json();
+    if (arr && arr.length) {
+      const coords = [parseFloat(arr[0].lat), parseFloat(arr[0].lon)];
+      geoCache[rawAddr] = coords;
+      try { localStorage.setItem('mes_geo_cache_v1', JSON.stringify(geoCache)); } catch (e) {}
+      return coords;
+    }
+  } catch (e) {}
+
+  return null;
+}
+
+async function updateLogisticsMap(orders) {
+  const map = await ensureLogisticsMap();
+  if (!map) return;
+
+  map.geoObjects.removeAll();
+  logPlacemarks = {};
+
+  const isDriver = state.user && state.user.role === 'driver';
+  const visibleOrders = orders.filter(o => {
+    if (o.status === 'cancelled') return false;
+    if (!isDriver) return true;
+    const isMine = Number(o.driver_id) === Number(state.user.id);
+    const isFree = !o.driver_id && (!o.driver_name || o.driver_name.trim() === '') && o.status !== 'shipped';
+    return isMine || isFree;
+  });
+
+  const bounds = [];
+  for (const o of visibleOrders) {
+    const coords = await geocodeMoscowOrder(o);
+    if (!coords) continue;
+    bounds.push(coords);
+
+    const isFree = !o.driver_id && (!o.driver_name || o.driver_name.trim() === '') && o.status !== 'shipped';
+    const preset = o.status === 'shipped' ? 'islands#darkGreenIcon' : (isFree ? 'islands#orangeIcon' : 'islands#blueIcon');
+
+    const mName = (state.models.find(m => m.id === o.model_id) || {}).name || '—';
+    const vName = (state.variants.find(v => v.id === o.variant_id) || {}).variant_name || '—';
+    const addrTxt = [o.city || 'Москва', o.street, o.house ? 'д.' + o.house : '', o.apartment ? 'кв.' + o.apartment : ''].filter(Boolean).join(', ');
+    const total = (Number(o.unit_price || 0) * Number(o.qty || 1)) + Number(o.delivery_cost || 0);
+    const paid = Number(o.pay_cash || 0) + Number(o.pay_card || 0) + Number(o.pay_bank || 0);
+    const toCollect = Math.max(0, total - paid);
+
+    const balloonBtn = isFree
+      ? '<br><button onclick="claimDelivery(' + o.id + ')" style="margin-top:6px;background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:bold;">🙋 Забронировать за собой</button>'
+      : '<div style="margin-top:4px;color:#1e40af;font-weight:bold;">🚚 Водитель: ' + (o.driver_name || 'Назначен') + '</div>';
+
+    const pm = new ymaps.Placemark(coords, {
+      iconContent: o.order_number,
+      balloonContentHeader: 'Заказ № ' + o.order_number + (o.delivery_time ? ' (' + o.delivery_time + ')' : ''),
+      balloonContentBody:
+        '<div style="font-size:13px;line-height:1.4;">' +
+        '<b>📍 ' + addrTxt + '</b><br>' +
+        '👤 ' + o.customer_name + (o.customer_phone ? ' (' + o.customer_phone + ')' : '') + '<br>' +
+        '🪑 ' + mName + ' (' + vName + ') — ' + o.qty + ' шт.<br>' +
+        '💰 К получению: <b>' + toCollect + ' ₽</b>' +
+        balloonBtn +
+        '</div>'
+    }, { preset: preset });
+
+    map.geoObjects.add(pm);
+    logPlacemarks[o.id] = pm;
+  }
+
+  if (bounds.length === 1) {
+    map.setCenter(bounds[0], 14);
+  } else if (bounds.length > 1) {
+    map.setBounds(ymaps.util.bounds.fromPoints(bounds), { checkZoomRange: true, zoomMargin: 45 });
+  } else {
+    map.setCenter([55.7558, 37.6173], 10);
+  }
+}
+
+function focusOrderOnMap(orderId) {
+  const pm = logPlacemarks[orderId];
+  if (!pm || !logMap) {
+    alert('Адрес этого заказа не удалось точно определить на карте — проверьте написание улицы и номера дома.');
+    return;
+  }
+  el('logisticsMap').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  logMap.setCenter(pm.geometry.getCoordinates(), 15, { duration: 300 }).then(() => { pm.balloon.open(); });
+}
+
+function initYandexSuggestOnce() {
+  if (yandexSuggestInited || !el('oAddrSuggest')) return;
+  try {
+    if (typeof ymaps !== 'undefined' && ymaps.SuggestView) {
+      ymaps.ready(() => {
+        try {
+          const sv = new ymaps.SuggestView('oAddrSuggest', { boundedBy: [[55.1, 36.8], [56.2, 38.5]], results: 7 });
+          sv.events.add('select', e => {
+            const val = e.get('item').value;
+            el('oAddrSuggest').value = val;
+            applySelectedAddress(val);
+          });
+          yandexSuggestInited = true;
+        } catch (err) {}
+      });
+    }
+  } catch (e) {}
+}
+
+function onAddrSuggestInput() {
+  const q = el('oAddrSuggest').value.trim();
+  const box = el('addrSuggestDropdown');
+  if (q.length < 3) { box.classList.add('hidden'); return; }
+
+  clearTimeout(suggestDebounce);
+  suggestDebounce = setTimeout(async () => {
+    try {
+      const searchStr = /москва|московск/i.test(q) ? q : ('Москва, ' + q);
+      const url = 'https://openstreetmap.org' + encodeURIComponent(searchStr);
+      const resp = await fetch(url);
+      const items = await resp.json();
+      if (!items || !items.length) { box.classList.add('hidden'); return; }
+
+      box.innerHTML = items.map(it => {
+        const a = it.address || {};
+        const city = a.city || a.town || a.village || a.state || 'Москва';
+        const road = a.road || a.pedestrian || a.suburb || '';
+        const house = a.house_number || '';
+        const label = [city, road, house ? 'д. ' + house : ''].filter(Boolean).join(', ') || it.display_name;
+        const safeData = encodeURIComponent(JSON.stringify({
+          city: city, road: road, house: house,
+          lat: parseFloat(it.lat), lon: parseFloat(it.lon), label: label
+        }));
+        return '<div onclick="pickSuggestItem(\'' + safeData + '\')" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f1f5f9;font-size:13px;" onmouseover="this.style.background=\'#eff6ff\'" onmouseout="this.style.background=\'#fff\'">📍 ' + label + '</div>';
+      }).join('');
+      box.classList.remove('hidden');
+    } catch (e) {}
+  }, 350);
+}
+
+function pickSuggestItem(encoded) {
+  const item = JSON.parse(decodeURIComponent(encoded));
+  el('oAddrSuggest').value = item.label;
+  el('addrSuggestDropdown').classList.add('hidden');
+  el('oCity').value = item.city || 'Москва';
+  el('oStreet').value = item.road || '';
+  el('oHouse').value = item.house || '';
+
+  const cacheKey = [el('oCity').value, el('oStreet').value, el('oHouse').value ? 'д. ' + el('oHouse').value : ''].filter(Boolean).join(', ');
+  if (item.lat && item.lon) {
+    geoCache[cacheKey] = [item.lat, item.lon];
+    try { localStorage.setItem('mes_geo_cache_v1', JSON.stringify(geoCache)); } catch (e) {}
+  }
+}
+
+async function applySelectedAddress(fullStr) {
+  el('addrSuggestDropdown').classList.add('hidden');
+  try {
+    if (typeof ymaps !== 'undefined') {
+      const res = await ymaps.geocode(fullStr, { results: 1 });
+      const obj = res.geoObjects.get(0);
+      if (obj) {
+        const c = obj.geometry.getCoordinates();
+        const localities = obj.getLocalities();
+        const thoroughfares = obj.getThoroughfares();
+        const premise = obj.getPremiseNumber();
+        el('oCity').value = (localities && localities[0]) ? localities[0] : 'Москва';
+        el('oStreet').value = (thoroughfares && thoroughfares[0]) ? thoroughfares[0] : '';
+        el('oHouse').value = premise || '';
+        const cacheKey = [el('oCity').value, el('oStreet').value, el('oHouse').value ? 'д. ' + el('oHouse').value : ''].filter(Boolean).join(', ');
+        geoCache[cacheKey] = c;
+        try { localStorage.setItem('mes_geo_cache_v1', JSON.stringify(geoCache)); } catch (e) {}
+      }
+    }
+  } catch (e) {}
 }
 
 window.addEventListener('DOMContentLoaded', bootstrap);
