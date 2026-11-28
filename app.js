@@ -841,8 +841,8 @@ function renderCatalogWorkers() {
 async function loadAnalytics() {
   const mStr = el('repMonth').value;
   const parts = mStr.split('-');
-  const yr = Number(parts);
-  const mo = Number(parts);
+const yr = Number(parts[0]);
+const mo = Number(parts[1]);
   const lastDay = new Date(yr, mo, 0).getDate();
   const dateFrom = mStr + '-01';
   const dateTo = mStr + '-' + String(lastDay).padStart(2, '0');
@@ -851,6 +851,9 @@ async function loadAnalytics() {
   let url = 'tasks?work_date=gte.' + dateFrom + '&work_date=lte.' + dateTo + '&status=eq.active';
   if (isWorker) url += '&worker_id=eq.' + state.user.id;
   const mTasks = await sbFetch(url) || [];
+const visibleWorkers = isWorker
+ ? state.workers.filter(w => w.id === state.user.id)
+ : state.workers.filter(w => w.role === 'worker');
 
   el('repWorkersBody').innerHTML = visibleWorkers.map(w => {
     const wt = mTasks.filter(t => t.worker_id === w.id);
@@ -977,8 +980,7 @@ function renderLogisticsGrids(orders) {
       actionHtml += '<button class="btn btn-green" style="flex:1;padding:7px;" onclick="completeDelivery(' + o.id + ',' + toCollect + ')">✅ Доставлено</button>';
     }
     actionHtml += '</div>';
-    }
-
+    
     const drvLine = !isDriver && o.driver_name
       ? '<div style="font-size:12px;color:#1e40af;margin-bottom:6px;">🚚 Водитель: <b>' + o.driver_name + '</b></div>'
       : '';
